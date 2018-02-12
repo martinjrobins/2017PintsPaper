@@ -1,20 +1,17 @@
-from celery import Celery
 import pints
 import pints.toy
 import numpy as np
 import matplotlib.pyplot as plt
 from timeit import default_timer as timer
+import argparse
 
-app = Celery('tasks', broker='pyamqp://guest@localhost//')
 
-
-@app.task
-def optimise(optimiser):
-    model = pints.toy.HodgkinHuxleyIKModel()
+def optimise(optimiser, model, noise):
+    model = model()
     real_parameters = model.suggested_parameters()
     times = model.suggested_times()
     values = model.simulate(real_parameters, times)
-    values += np.random.normal(0, 10, values.shape)
+    values += np.random.normal(0, noise, values.shape)
     problem = pints.SingleSeriesProblem(model, times, values)
     score = pints.SumOfSquaresError(problem)
     lower = [x / 10.0 for x in real_parameters]
@@ -24,36 +21,14 @@ def optimise(optimiser):
     boundaries = pints.Boundaries(lower, upper)
 
     start = timer()
-    if optimiser == 'cmaes':
-        found_parameters, found_value = pints.cmaes(
-            score,
-            boundaries,
-            middle,
-            sigma,
-        )
-    elif optimiser == 'pso':
-        found_parameters, found_value = pints.pso(
-            score,
-            boundaries,
-            middle
-        )
-    elif optimiser == 'snes':
-        found_parameters, found_value = pints.snes(
-            score,
-            boundaries,
-            middle,
-            sigma,
-        )
-    elif optimiser == 'xnes':
-        found_parameters, found_value = pints.xnes(
-            score,
-            boundaries,
-            middle,
-            sigma,
-        )
+    found_parameters, found_value = pints.optimise(
+        score,
+        middle,
+        sigma0=sigma,
+        boundaries=boundaries,
+        method=optimiser,
+    )
     end = timer()
-    found_score = score(found_parameters)
-    found_values = problem.evaluate(found_parameters)
 
     plt.figure()
     plt.xlabel('Time')
@@ -62,11 +37,11 @@ def optimise(optimiser):
         plt.plot(t, v, c='b', label='Noisy data')
     for t, v in model.fold(times, found_value):
         plt.plot(t, v, c='r', label='Fit')
-    plt.title('Fit for %s, score = %f' % (optimiser, found_score))
+    plt.title('Fit for %s, score = %f' % (optimiser, found_value))
     plt.savefig('fit_for_%s' % (optimiser))
 
-    return found_score, end - start
+    return found_parameters, found_value, end - start
 
 
 if __name__ == "__main__":
-    optimise('pso')
+    optimise(pints.PSO, pints.toy.HodgkinHuxleyIKModel, 10.0)
