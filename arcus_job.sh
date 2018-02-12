@@ -22,6 +22,7 @@
 # SLURM_CPUS_PER_TASK is set to the value of -c, but only if -c is explicitly set
 
 module load python
+pip install --user ./pints
 
 if [ -n "$SLURM_CPUS_PER_TASK" ]; then
     omp_threads=$SLURM_CPUS_PER_TASK
