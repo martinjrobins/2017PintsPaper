@@ -7,6 +7,7 @@ from itertools import repeat
 
 
 def optimise(sample, optimiser, model, noise, times, real_parameters):
+    print('Running sample' + str(sample))
     the_model = model()
     values = the_model.simulate(real_parameters, times)
     value_range = np.max(values) - np.min(values)

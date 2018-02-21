@@ -14,7 +14,6 @@ parameters = [[0.015, 500.0],
               pints.toy.HodgkinHuxleyIKModel().suggested_parameters()]
 times = [np.linspace(0, 1000, 1000),
          pints.toy.HodgkinHuxleyIKModel().suggested_times()]
-times = [np.linspace(0, 1000, 1000)]
 optimisers = [pints.CMAES, pints.PSO, pints.XNES, pints.SNES]
 noise_levels = [0.01, 0.1]
 num_samples = 5
@@ -82,6 +81,7 @@ if __name__ == "__main__":
                     print('reading ' + fname)
                     if os.path.exists(fname):
                         output = pickle.load(open(fname, 'rb'))
+                        assert(len(output[:, 1] == num_samples))
                         score[nm, no, :] = output[:, 1]
                         time[nm, no, :] = output[:, 2]
                     else:
@@ -91,12 +91,12 @@ if __name__ == "__main__":
             for nm, model in enumerate(models):
                 min_score = np.min(score[nm, :, :], axis=(0, 1))
                 max_score = np.max(score[nm, :, :], axis=(0, 1))
-                score[nm, :, :] = (score[nm, :, :] - min_score) / \
-                    (max_score - min_score)
+                score[nm, :, :] = (score[nm, :, :] -
+                                   min_score) / (max_score - min_score)
                 min_time = np.min(time[nm, :, :], axis=(0, 1))
                 max_time = np.max(time[nm, :, :], axis=(0, 1))
-                time[nm, :, :] = (time[nm, :, :] - min_time) / \
-                    (max_time - min_time)
+                time[nm, :, :] = (time[nm, :, :] -
+                                  min_time) / (max_time - min_time)
 
             plt.clf()
             imshow = plt.imshow(np.mean(score, axis=2), cmap='RdYlBu_r',
