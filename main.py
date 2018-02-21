@@ -16,7 +16,7 @@ times = [np.linspace(0, 1000, 1000),
 times = [np.linspace(0, 1000, 1000)]
 optimisers = [pints.CMAES, pints.PSO, pints.XNES, pints.SNES]
 noise_levels = [0.01, 0.1]
-num_samples = 20
+num_samples = 5
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run matrix.')
