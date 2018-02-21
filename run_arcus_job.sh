@@ -11,4 +11,5 @@ git clone https://github.com/pints-team/pints.git pints_repo
 mv pints_repo/pints .
 module load python/3.5
 s=`python3 main.py --max`
+echo $s
 sbatch --array=0-$s arcus_job.sh
