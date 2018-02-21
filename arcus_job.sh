@@ -27,7 +27,7 @@
 #module unload intel-mkl
 #module unload intel-compilers
 module load python/3.5
-pip install --user ./pints
+#pip install --user ./pints
 
 if [ -n "$SLURM_CPUS_PER_TASK" ]; then
     omp_threads=$SLURM_CPUS_PER_TASK
