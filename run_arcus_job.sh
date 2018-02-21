@@ -8,7 +8,7 @@ cd $dir
 git clone git@github.com:martinjrobins/2017PintsPaper.git 
 cd 2017PintsPaper
 git clone https://github.com/pints-team/pints.git
-module load python
+module load python/3.3
 pip install --user ./pints
 s=`python main.py --max`
 sbatch --array=0-$s arcus_job.sh

@@ -4,6 +4,7 @@ import argparse
 from math import floor
 from subprocess import call
 import os
+import sys
 import pickle
 import matplotlib.pyplot as plt
 import numpy as np
@@ -33,6 +34,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     size = len(models) * len(optimisers) * len(noise_levels)
+
+    print(sys.version)
 
     if args.max:
         print(size - 1)

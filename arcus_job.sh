@@ -24,7 +24,6 @@
 # with a fallback in case it isn't set.
 # SLURM_CPUS_PER_TASK is set to the value of -c, but only if -c is explicitly set
 
-module load python/3.5
 pip install --user ./pints
 
 if [ -n "$SLURM_CPUS_PER_TASK" ]; then
@@ -34,4 +33,4 @@ else
 fi
 export set OMP_NUM_THREADS=$omp_threads
 
-python3 main.py --integer ${SLURM_ARRAY_TASK_ID}
+python main.py --integer ${SLURM_ARRAY_TASK_ID}
