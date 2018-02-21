@@ -35,8 +35,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     size = len(models) * len(optimisers) * len(noise_levels)
 
-    print(sys.version)
-
     if args.max:
         print(size - 1)
     elif args.execute:
