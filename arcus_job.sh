@@ -3,13 +3,16 @@
 # set the number of nodes
 #SBATCH --nodes=1
 
+# set the partition where the job will run
+#SBATCH --partition=devel
+
 #SBATCH --cpus-per-task=8
 
 # set max wallclock time
-#SBATCH --time=100:00:00
+#SBATCH --time=1:00:00
 
 # set name of job
-#SBATCH --job-name=filter
+#SBATCH --job-name=pints_matrix
 
 # mail alert at start, end and abortion of execution
 #SBATCH --mail-type=ALL

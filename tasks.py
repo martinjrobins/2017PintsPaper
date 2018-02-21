@@ -6,13 +6,12 @@ from timeit import default_timer as timer
 import argparse
 
 
-def optimise(optimiser, model, noise):
-    model = model()
-    real_parameters = model.suggested_parameters()
-    times = model.suggested_times()
-    values = model.simulate(real_parameters, times)
-    values += np.random.normal(0, noise, values.shape)
-    problem = pints.SingleSeriesProblem(model, times, values)
+def optimise(optimiser, model, noise, times, real_parameters):
+    the_model = model()
+    values = the_model.simulate(real_parameters, times)
+    value_range = np.max(values) - np.min(values)
+    values += np.random.normal(0, noise * value_range, values.shape)
+    problem = pints.SingleSeriesProblem(the_model, times, values)
     score = pints.SumOfSquaresError(problem)
     lower = [x / 10.0 for x in real_parameters]
     upper = [x * 10.0 for x in real_parameters]
@@ -29,16 +28,16 @@ def optimise(optimiser, model, noise):
         method=optimiser,
     )
     end = timer()
+    found_values = the_model.simulate(found_parameters, times)
 
     plt.figure()
     plt.xlabel('Time')
     plt.ylabel('Value')
-    for t, v in model.fold(times, values):
-        plt.plot(t, v, c='b', label='Noisy data')
-    for t, v in model.fold(times, found_value):
-        plt.plot(t, v, c='r', label='Fit')
-    plt.title('Fit for %s, score = %f' % (optimiser, found_value))
-    plt.savefig('fit_for_%s' % (optimiser))
+    plt.plot(times, values, c='b', label='Noisy data')
+    plt.plot(times, found_values, c='r', label='Fit')
+    plt.title('score = %f' % (found_value))
+    plt.savefig('fit_for_optimiser_%s_and_model_%s_with_noise_%f.pdf' %
+                (optimiser.__name__, model.__name__, noise))
 
     return found_parameters, found_value, end - start
 

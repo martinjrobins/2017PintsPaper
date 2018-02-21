@@ -7,10 +7,13 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 
-
 models = [pints.toy.LogisticModel, pints.toy.HodgkinHuxleyIKModel]
+parameters = [[0.015, 500.0],
+              pints.toy.HodgkinHuxleyIKModel().suggested_parameters()]
+times = [np.linspace(0, 1000, 1000),
+         pints.toy.HodgkinHuxleyIKModel().suggested_times()]
 optimisers = [pints.CMAES, pints.PSO, pints.XNES, pints.SNES]
-noise_levels = [10.0]
+noise_levels = [0.01]
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run matrix.')
@@ -38,8 +41,10 @@ if __name__ == "__main__":
         i = floor(i / len(optimisers))
         nm = i % len(models)
         print('running matrix (%d,%d,%d)' % (nm, no, ni))
-        output = optimise(models[nm], optimisers[no], noise_levels[ni])
-        pickle.dump(output, 'output_%d_%d_%d.pickle' % (nm, no, ni))
+        output = optimise(optimisers[no], models[nm],
+                          noise_levels[ni], times[nm], parameters[nm])
+        pickle.dump(output, open('output_%d_%d_%d.pickle' %
+                                 (nm, no, ni), "wb"))
     elif args.plot:
         score = np.zeros(len(models), len(optimisers))
         time = np.zeros(len(models), len(optimisers))
