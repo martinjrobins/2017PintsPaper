@@ -9,6 +9,7 @@ git clone git@github.com:martinjrobins/2017PintsPaper.git
 cd 2017PintsPaper
 git clone https://github.com/pints-team/pints.git
 module load python/3.5
+export set TMPDIR=`pwd`
 pip install --user ./pints
 s=`python3 main.py --max`
 sbatch --array=0-$s arcus_job.sh
