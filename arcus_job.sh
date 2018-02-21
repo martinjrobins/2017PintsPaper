@@ -34,4 +34,4 @@ else
 fi
 export set OMP_NUM_THREADS=$omp_threads
 
-python main.py --integer ${SLURM_ARRAY_TASK_ID}
+python3 main.py --integer ${SLURM_ARRAY_TASK_ID}
