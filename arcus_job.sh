@@ -9,7 +9,7 @@
 #SBATCH --cpus-per-task=8
 
 # set max wallclock time
-#SBATCH --time=1:00:00
+#SBATCH --time=0:10:00
 
 # set name of job
 #SBATCH --job-name=pints_matrix
