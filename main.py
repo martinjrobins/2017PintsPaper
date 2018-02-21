@@ -41,9 +41,9 @@ if __name__ == "__main__":
     elif args.integer is not None:
         i = args.integer
         ni = i % len(noise_levels)
-        i = floor(i / len(noise_levels))
+        i = int(floor(i / len(noise_levels)))
         no = i % len(optimisers)
-        i = floor(i / len(optimisers))
+        i = int(floor(i / len(optimisers)))
         nm = i % len(models)
         print('running matrix (%d,%d,%d)' % (nm, no, ni))
         output = optimise_sampler(num_samples, optimisers[no], models[nm],
