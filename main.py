@@ -104,7 +104,7 @@ if __name__ == "__main__":
                     print('reading ' + fname)
                     if os.path.exists(fname):
                         output = pickle.load(open(fname, 'rb'))
-                        assert(len(output[:, 1] == num_samples))
+                        assert(len(output[:, 1]) == num_samples)
                         score[nm, no, :] = output[:, 1]
                         time[nm, no, :] = output[:, 2]
                     else:

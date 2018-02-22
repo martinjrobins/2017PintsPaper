@@ -29,9 +29,13 @@ def optimise(sample, optimiser, model, noise, times, real_parameters):
         method=optimiser,
     )
     end = timer()
-    start_problem_eval = timer()
-    minimum_value = problem.evaluate(real_parameters)
-    end_problem_eval = timer()
+    N = 10
+    start_score = timer()
+    for i in range(N):
+        minimum_value = score(real_parameters)
+    end_score = timer()
+    score_duration = (end_score - start_score) / N
+
     #found_values = the_model.simulate(found_parameters, times)
 
     # plt.figure()
@@ -45,7 +49,7 @@ def optimise(sample, optimiser, model, noise, times, real_parameters):
 
     return found_parameters,  \
         found_value / minimum_value, \
-        (end - start) / (end_problem_eval - start_problem_eval)
+        (end - start) / score_duration
 
 
 def mcmc(sample, mcmc_method, model, noise, times, real_parameters):
