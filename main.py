@@ -125,27 +125,29 @@ if __name__ == "__main__":
                         ess[nm, no, :] = float('nan')
                         time_mcmc[nm, no, :] = float('nan')
 
-            for nm, model in enumerate(models):
-                min_score = np.min(score[nm, :, :], axis=(0, 1))
-                max_score = np.max(score[nm, :, :], axis=(0, 1))
-                score[nm, :, :] = (score[nm, :, :] -
-                                   min_score) / (max_score - min_score)
-                min_time = np.min(time[nm, :, :], axis=(0, 1))
-                max_time = np.max(time[nm, :, :], axis=(0, 1))
-                time[nm, :, :] = (time[nm, :, :] -
-                                  min_time) / (max_time - min_time)
-                min_rhat = np.min(rhat[nm, :, :], axis=(0, 1))
-                max_rhat = np.max(rhat[nm, :, :], axis=(0, 1))
-                rhat[nm, :, :] = (rhat[nm, :, :] -
-                                  min_rhat) / (max_rhat - min_rhat)
-                min_ess = np.min(ess[nm, :, :], axis=(0, 1))
-                max_ess = np.max(ess[nm, :, :], axis=(0, 1))
-                ess[nm, :, :] = (ess[nm, :, :] -
-                                 min_ess) / (max_ess - min_ess)
-                min_time_mcmc = np.min(time_mcmc[nm, :, :], axis=(0, 1))
-                max_time_mcmc = np.max(time_mcmc[nm, :, :], axis=(0, 1))
-                time_mcmc[nm, :, :] = (time_mcmc[nm, :, :] -
-                                       min_time_mcmc) / (max_time_mcmc - min_time_mcmc)
+            normalise = False
+            if normalise:
+                for nm, model in enumerate(models):
+                    min_score = np.min(score[nm, :, :], axis=(0, 1))
+                    max_score = np.max(score[nm, :, :], axis=(0, 1))
+                    score[nm, :, :] = (score[nm, :, :] -
+                                       min_score) / (max_score - min_score)
+                    min_time = np.min(time[nm, :, :], axis=(0, 1))
+                    max_time = np.max(time[nm, :, :], axis=(0, 1))
+                    time[nm, :, :] = (time[nm, :, :] -
+                                      min_time) / (max_time - min_time)
+                    min_rhat = np.min(rhat[nm, :, :], axis=(0, 1))
+                    max_rhat = np.max(rhat[nm, :, :], axis=(0, 1))
+                    rhat[nm, :, :] = (rhat[nm, :, :] -
+                                      min_rhat) / (max_rhat - min_rhat)
+                    min_ess = np.min(ess[nm, :, :], axis=(0, 1))
+                    max_ess = np.max(ess[nm, :, :], axis=(0, 1))
+                    ess[nm, :, :] = (ess[nm, :, :] -
+                                     min_ess) / (max_ess - min_ess)
+                    min_time_mcmc = np.min(time_mcmc[nm, :, :], axis=(0, 1))
+                    max_time_mcmc = np.max(time_mcmc[nm, :, :], axis=(0, 1))
+                    time_mcmc[nm, :, :] = (time_mcmc[nm, :, :] -
+                                           min_time_mcmc) / (max_time_mcmc - min_time_mcmc)
 
             plt.clf()
             imshow = plt.imshow(np.mean(score, axis=2), cmap='RdYlBu_r',
