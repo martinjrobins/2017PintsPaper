@@ -15,7 +15,8 @@ parameters = [[0.015, 500.0],
 times = [np.linspace(0, 1000, 1000),
          pints.toy.HodgkinHuxleyIKModel().suggested_times()]
 optimisers = [pints.CMAES, pints.PSO, pints.XNES, pints.SNES]
-mcmcs = [pints.AdaptiveCovarianceMCMC, pints.DifferentialEvolutionMCMC]
+mcmcs = [pints.MetropolisRandomWalkMCMC,
+         pints.AdaptiveCovarianceMCMC, pints.DifferentialEvolutionMCMC]
 noise_levels = [0.01, 0.1]
 num_samples = 5
 

@@ -1,4 +1,5 @@
 #!/bin/bash
+ssh login11
 cd $DATA
 now=$(date +"%m_%d_%Y")
 dir=${DATA}/pints_matrix_${now}
