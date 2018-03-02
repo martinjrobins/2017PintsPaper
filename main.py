@@ -18,7 +18,7 @@ optimisers = [pints.CMAES, pints.PSO, pints.XNES, pints.SNES]
 mcmcs = [pints.MetropolisRandomWalkMCMC,
          pints.AdaptiveCovarianceMCMC, pints.DifferentialEvolutionMCMC]
 noise_levels = [0.01, 0.1]
-num_samples = 5
+num_samples = 20
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run matrix.')

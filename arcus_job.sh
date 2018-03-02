@@ -4,12 +4,12 @@
 #SBATCH --nodes=1
 
 # set the partition where the job will run
-#SBATCH --partition=devel
+#SBATCH --partition=compute
 
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=1
 
 # set max wallclock time
-#SBATCH --time=0:10:00
+#SBATCH --time=5:00:00
 
 # set name of job
 #SBATCH --job-name=pints_matrix
@@ -37,3 +37,4 @@ fi
 export set OMP_NUM_THREADS=$omp_threads
 
 python3 main.py --integer ${SLURM_ARRAY_TASK_ID}
+echo $SECONDS
