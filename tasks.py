@@ -71,7 +71,7 @@ def mcmc(sample, mcmc_method, model, noise, times, real_parameters):
     xs = [x * (upper - lower) + lower for x in np.random.uniform(size=3)]
     mcmc = pints.MCMCSampling(log_posterior, 3, xs, method=mcmc_method)
     # mcmc.set_max_iterations(10000)
-    mcmc.set_verbose(False)
+    # mcmc.set_verbose(False)
 
     start = timer()
     chains = mcmc.run()
