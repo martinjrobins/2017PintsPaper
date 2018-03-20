@@ -6,16 +6,15 @@ import multiprocessing
 from itertools import repeat
 
 
-def optimise(sample, optimiser, model, noise, times, real_parameters):
+def optimise(sample, optimiser, model, noise, times, real_parameters, lower, upper):
     print('Running sample' + str(sample))
     the_model = model()
+
     values = the_model.simulate(real_parameters, times)
     value_range = np.max(values) - np.min(values)
     values += np.random.normal(0, noise * value_range, values.shape)
     problem = pints.SingleSeriesProblem(the_model, times, values)
     score = pints.SumOfSquaresError(problem)
-    lower = [x / 10.0 for x in real_parameters]
-    upper = [x * 10.0 for x in real_parameters]
     middle = [0.5 * (u + l) for l, u in zip(lower, upper)]
     sigma = [u - l for l, u in zip(lower, upper)]
     boundaries = pints.Boundaries(lower, upper)
@@ -52,7 +51,7 @@ def optimise(sample, optimiser, model, noise, times, real_parameters):
         (end - start) / score_duration
 
 
-def mcmc(sample, mcmc_method, model, noise, times, real_parameters):
+def mcmc(sample, mcmc_method, model, noise, times, real_parameters, lower, upper):
     print('Running sample' + str(sample))
     the_model = model()
     values = the_model.simulate(real_parameters, times)
@@ -60,18 +59,20 @@ def mcmc(sample, mcmc_method, model, noise, times, real_parameters):
     values += np.random.normal(0, noise * value_range, values.shape)
     problem = pints.SingleSeriesProblem(the_model, times, values)
     log_likelihood = pints.UnknownNoiseLogLikelihood(problem)
-    lower = np.array(
-        [x / 10.0 for x in list(real_parameters) + [value_range * noise]])
-    upper = np.array(
-        [x * 10.0 for x in list(real_parameters) + [value_range * noise]])
+    lower = list(lower) + [value_range * noise / 10.0]
+    upper = list(upper) + [value_range * noise * 10]
     middle = [0.5 * (u + l) for l, u in zip(lower, upper)]
     sigma = [u - l for l, u in zip(lower, upper)]
     log_prior = pints.UniformLogPrior(lower, upper)
     log_posterior = pints.LogPosterior(log_likelihood, log_prior)
-    xs = [x * (upper - lower) + lower for x in np.random.uniform(size=3)]
+    n_chains = 3
+    xs = [[np.random.uniform() * (u - l) + l for l, u in zip(lower, upper)]
+          for c in range(n_chains)]
     mcmc = pints.MCMCSampling(log_posterior, 3, xs, method=mcmc_method)
     # mcmc.set_max_iterations(10000)
     # mcmc.set_verbose(False)
+    #logger_fn = 'logger_info.out'
+    # mcmc.set_log_to_file(logger_fn)
 
     start = timer()
     chains = mcmc.run()
@@ -82,20 +83,23 @@ def mcmc(sample, mcmc_method, model, noise, times, real_parameters):
     for chain in chains:
         ess += pints._diagnostics.effective_sample_size(chain)
     ess = np.min(ess)
+    print(rhat)
+    print(ess)
+    print(end - start)
     return rhat, ess, end - start
 
 
-def optimise_sampler(num_samples, optimiser, model, noise, times, real_parameters):
+def optimise_sampler(num_samples, optimiser, model, noise, times, real_parameters, lower, upper):
     p = multiprocessing.Pool(multiprocessing.cpu_count())
     args = zip(range(num_samples), repeat(optimiser), repeat(
-        model), repeat(noise), repeat(times), repeat(real_parameters))
+        model), repeat(noise), repeat(times), repeat(real_parameters), repeat(lower), repeat(upper))
     results = p.starmap(optimise, args)
     return np.array(results)
 
 
-def mcmc_sampler(num_samples, mcmc_method, model, noise, times, real_parameters):
+def mcmc_sampler(num_samples, mcmc_method, model, noise, times, real_parameters, lower, upper):
     p = multiprocessing.Pool(multiprocessing.cpu_count())
     args = zip(range(num_samples), repeat(mcmc_method), repeat(
-        model), repeat(noise), repeat(times), repeat(real_parameters))
+        model), repeat(noise), repeat(times), repeat(real_parameters), repeat(lower), repeat(upper))
     results = p.starmap(mcmc, args)
     return np.array(results)

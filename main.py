@@ -9,11 +9,22 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 
-models = [pints.toy.LogisticModel, pints.toy.HodgkinHuxleyIKModel]
+models = [pints.toy.LogisticModel, pints.toy.HodgkinHuxleyIKModel,
+          pints.toy.GoodwinOscillatorModel]
+analytic_models = [pints.toy.RosenbrockLogPDF,
+                   pints.toy.TwistedGaussianLogPDF,
+                   pints.toy.MultimodalNormalLogPDF,
+                   pints.toy.HighDimensionalNormalLogPDF]
 parameters = [[0.015, 500.0],
-              pints.toy.HodgkinHuxleyIKModel().suggested_parameters()]
+              pints.toy.HodgkinHuxleyIKModel().suggested_parameters(),
+              pints.toy.GoodwinOscillatorModel().suggested_parameters()]
+lower = [[p / 10.0 for p in parameters[0]],
+         [p / 10.0 for p in parameters[1]], [p / 10.0 for p in parameters[2]]]
+upper = [[p * 10.0 for p in parameters[0]],
+         [p * 10.0 for p in parameters[1]], [p * 10.0 for p in parameters[2]]]
 times = [np.linspace(0, 1000, 1000),
-         pints.toy.HodgkinHuxleyIKModel().suggested_times()]
+         pints.toy.HodgkinHuxleyIKModel().suggested_times(),
+         pints.toy.GoodwinOscillatorModel().suggested_times()]
 optimisers = [pints.CMAES, pints.PSO, pints.XNES, pints.SNES]
 mcmcs = [pints.MetropolisRandomWalkMCMC,
          pints.AdaptiveCovarianceMCMC, pints.DifferentialEvolutionMCMC]
@@ -50,10 +61,10 @@ if __name__ == "__main__":
         print('running matrix (%d,%d,%d)' % (nm, no, ni))
         if no >= len(optimisers):
             output = mcmc_sampler(num_samples, mcmcs[no - len(optimisers)], models[nm],
-                                  noise_levels[ni], times[nm], parameters[nm])
+                                  noise_levels[ni], times[nm], parameters[nm], lower[nm], upper[nm])
         else:
             output = optimise_sampler(num_samples, optimisers[no], models[nm],
-                                      noise_levels[ni], times[nm], parameters[nm])
+                                      noise_levels[ni], times[nm], parameters[nm], lower[nm], upper[nm])
         fname = 'output_%d_%d_%d.pickle' % (nm, no, ni)
         print('writing ' + fname)
         pickle.dump(output, open(fname, 'wb'))
@@ -65,7 +76,7 @@ if __name__ == "__main__":
                     try:
                         output = optimise_sampler(num_samples, optimiser,
                                                   model, noise, times[nm],
-                                                  parameters[nm])
+                                                  parameters[nm], lower[nm], upper[nm])
                         fname = 'output_%d_%d_%d.pickle' % (nm, no, ni)
                         print('writing ' + fname)
                         pickle.dump(output, open(fname, 'wb'))
@@ -76,7 +87,7 @@ if __name__ == "__main__":
                     try:
                         output = mcmc_sampler(num_samples, optimiser,
                                               model, noise, times[nm],
-                                              parameters[nm])
+                                              parameters[nm], lower[nm], upper[nm])
                         fname = 'output_%d_%d_%d.pickle' % (
                             nm, no + len(optimisers), ni)
                         print('writing ' + fname)
@@ -181,7 +192,7 @@ if __name__ == "__main__":
             plt.yticks(y, y_labels)
             plt.colorbar(label='time (min)')
             plt.tight_layout()
-            plt.savefig('time_mean_with_noise_%d.pdf' % ni)
+            plt.savefig('time_min_with_noise_%d.pdf' % ni)
 
             plt.clf()
             imshow = plt.imshow(np.mean(rhat, axis=2), cmap='RdYlBu_r',
@@ -214,7 +225,7 @@ if __name__ == "__main__":
             plt.yticks(y, y_labels)
             plt.colorbar(label='ess (min)')
             plt.tight_layout()
-            plt.savefig('ess_mean_with_noise_%d.pdf' % ni)
+            plt.savefig('ess_min_with_noise_%d.pdf' % ni)
             plt.clf()
             plt.imshow(np.mean(time_mcmc, axis=2),
                        cmap='RdYlBu_r', interpolation='nearest')
@@ -230,4 +241,4 @@ if __name__ == "__main__":
             plt.yticks(y, y_labels)
             plt.colorbar(label='time_mcmc (min)')
             plt.tight_layout()
-            plt.savefig('time_mcmc_mean_with_noise_%d.pdf' % ni)
+            plt.savefig('time_mcmc_min_with_noise_%d.pdf' % ni)
