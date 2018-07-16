@@ -8,7 +8,7 @@ from GPyOpt.methods import BayesianOptimization
 
 
 class HyperOptimiser:
-    __init__(self, optimiser, model, noise, times, real_parameters, lower, upper):
+    def __init__(self, optimiser, model, noise, times, real_parameters, lower, upper):
         self.optimiser = optimiser
         self.model = model
         self.noise = noise
@@ -17,7 +17,7 @@ class HyperOptimiser:
         self.lower = lower
         self.upper = upper
 
-    __call__(self):
+    def __call__(self):
         the_model = self.model()
         values = the_model.simulate(self.real_parameters, self.times)
         value_range = np.max(values) - np.min(values)
@@ -61,7 +61,7 @@ class HyperOptimiser:
 
 
 class HyperSampler:
-    __init__(self, mcmc_method, model, noise, times, real_parameters, lower, upper):
+    def __init__(self, mcmc_method, model, noise, times, real_parameters, lower, upper):
         self.mcmc_method = mcmc_method
         self.model = model
         self.noise = noise
@@ -70,7 +70,7 @@ class HyperSampler:
         self.lower = lower
         self.upper = upper
 
-    __call__(self):
+    def __call__(self):
         the_model = self.model()
         values = the_model.simulate(self.real_parameters, self.times)
         value_range = np.max(values) - np.min(values)
@@ -108,12 +108,13 @@ class HyperSampler:
 
 
 def optimise_sampler(num_samples, hyper):
-    // tune hyper
-    myBopt = BayesianOptimization(f=hyper, domain=hyper.domain)
-    myBopt.run_optimization(max_iter=num_samples)
-    hyper(myBopt.x_opt)
+    # tune hyper
+    if (hyper.n_parameters() > 0):
+        myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds())
+        myBopt.run_optimization(max_iter=num_samples)
+        hyper(myBopt.x_opt)
 
-    // take samples
+    # take samples
     p = multiprocessing.Pool(multiprocessing.cpu_count())
     args = zip(range(num_samples), repeat(hyper))
     results = p.starmap(optimise, args)
@@ -121,10 +122,11 @@ def optimise_sampler(num_samples, hyper):
 
 
 def mcmc_sampler(num_samples, hyper):
-    // tune hyper
-    myBopt = BayesianOptimization(f=hyper, domain=hyper.domain)
-    myBopt.run_optimization(max_iter=num_samples)
-    hyper(myBopt.x_opt)
+    # tune hyper
+    if (hyper.n_parameters() > 0):
+        myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds())
+        myBopt.run_optimization(max_iter=num_samples)
+        hyper(myBopt.x_opt)
 
     p = multiprocessing.Pool(multiprocessing.cpu_count())
     args = zip(range(num_samples), repeat(hyper))
