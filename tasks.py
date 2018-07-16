@@ -17,25 +17,28 @@ class HyperOptimiser:
         self.lower = lower
         self.upper = upper
 
-    def __call__(self):
+    def optimise(self, set_hyper_params):
         the_model = self.model()
         values = the_model.simulate(self.real_parameters, self.times)
         value_range = np.max(values) - np.min(values)
         values += np.random.normal(0, self.noise * value_range, values.shape)
-        problem = pints.SingleSeriesProblem(the_model, times, values)
+        problem = pints.SingleOutputProblem(the_model, self.times, values)
         score = pints.SumOfSquaresError(problem)
         middle = [0.5 * (u + l) for l, u in zip(self.lower, self.upper)]
         sigma = [u - l for l, u in zip(self.lower, self.upper)]
         boundaries = pints.Boundaries(self.lower, self.upper)
 
-        start = timer()
-        found_parameters, found_value = pints.optimise(
+        optimisation = pints.Optimisation(
             score,
             middle,
             sigma0=sigma,
             boundaries=boundaries,
-            method=optimiser,
+            method=self.optimiser
         )
+        set_hyper_params(optimisation.optimiser())
+
+        start = timer()
+        found_parameters, found_value = optimisation.run()
         end = timer()
         N = 10
         start_score = timer()
@@ -70,12 +73,12 @@ class HyperSampler:
         self.lower = lower
         self.upper = upper
 
-    def __call__(self):
+    def sample(self, set_hyper_params):
         the_model = self.model()
         values = the_model.simulate(self.real_parameters, self.times)
         value_range = np.max(values) - np.min(values)
         values += np.random.normal(0, self.noise * value_range, values.shape)
-        problem = pints.SingleSeriesProblem(the_model, times, values)
+        problem = pints.SingleOutputProblem(the_model, self.times, values)
         log_likelihood = pints.UnknownNoiseLogLikelihood(problem)
         lower = list(self.lower) + [value_range * self.noise / 10.0]
         upper = list(self.upper) + [value_range * self.noise * 10]
@@ -86,10 +89,11 @@ class HyperSampler:
         n_chains = 3
         xs = [[np.random.uniform() * (u - l) + l for l, u in zip(lower, upper)]
               for c in range(n_chains)]
-        mcmc = pints.MCMCSampling(log_posterior, 3, xs, method=mcmc_method)
+        mcmc = pints.MCMCSampling(log_posterior, 3, xs, method=self.mcmc_method)
+        [set_hyper_params(sampler) for sampler in mcmc.samplers()]
         # mcmc.set_max_iterations(10000)
         # mcmc.set_verbose(False)
-        #logger_fn = 'logger_info.out'
+        # logger_fn = 'logger_info.out'
         # mcmc.set_log_to_file(logger_fn)
 
         start = timer()
@@ -107,18 +111,30 @@ class HyperSampler:
         return rhat, ess, end - start
 
 
+def optimise(sample_num, hyper, x):
+    print('optimise for sample', sample_num)
+    hyper(x)
+
+
 def optimise_sampler(num_samples, hyper):
     # tune hyper
     if (hyper.n_parameters() > 0):
         myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds())
         myBopt.run_optimization(max_iter=num_samples)
-        hyper(myBopt.x_opt)
+        x_opt = myBopt.x_opt
+    else:
+        x_opt = []
 
-    # take samples
+        # take samples
     p = multiprocessing.Pool(multiprocessing.cpu_count())
-    args = zip(range(num_samples), repeat(hyper))
+    args = zip(range(num_samples), repeat(hyper), repeat(x_opt))
     results = p.starmap(optimise, args)
     return np.array(results)
+
+
+def sample(sample_num, hyper, x):
+    print('sampling for sample', sample_num)
+    hyper(x)
 
 
 def mcmc_sampler(num_samples, hyper):
@@ -126,9 +142,12 @@ def mcmc_sampler(num_samples, hyper):
     if (hyper.n_parameters() > 0):
         myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds())
         myBopt.run_optimization(max_iter=num_samples)
-        hyper(myBopt.x_opt)
+        x_opt = myBopt.x_opt
+    else:
+        x_opt = []
 
     p = multiprocessing.Pool(multiprocessing.cpu_count())
-    args = zip(range(num_samples), repeat(hyper))
-    results = p.starmap(mcmc, args)
+
+    args = zip(range(num_samples), repeat(hyper), repeat(x_opt))
+    results = p.starmap(sample, args)
     return np.array(results)

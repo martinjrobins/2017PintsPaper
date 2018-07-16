@@ -44,13 +44,15 @@ class HyperCMAES(HyperOptimiser):
         return 1
 
     def bounds(self):
-        suggest = self.optimiser().suggested_population_size()
-        return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(1, 10*suggest)}]
+        suggest = self.optimiser(np.zeros(self.model().n_parameters())).suggested_population_size()
+        return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(2, 10*suggest)}]
 
     def __call__(self, x):
         print('calling CMAES with', x)
-        self.optimiser.set_population_size(x)
-        return super(HyperCMAES, self)()[1]
+
+        def set_hyper_params(opt):
+            opt.set_population_size(x[0])
+        return self.optimise(set_hyper_params)[1]
 
 
 class HyperPSO(HyperOptimiser):
@@ -61,15 +63,17 @@ class HyperPSO(HyperOptimiser):
         return 2
 
     def bounds(self):
-        suggest = self.optimiser().suggested_population_size()
-        return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(1, 10*suggest)},
+        suggest = self.optimiser(np.zeros(self.model().n_parameters())).suggested_population_size()
+        return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(2, 10*suggest)},
                 {'name': 'balance', 'type': 'continuous', 'domain': (0, 1)}]
 
     def __call__(self, x):
         print('calling PSE with', x)
-        self.optimiser.set_population_size(x[0])
-        self.optimiser.set_local_global_balance(x[1])
-        return super(HyperPSO, self)()[1]
+
+        def set_hyper_params(opt):
+            opt.set_population_size(x[0])
+            opt.set_local_global_balance(x[1])
+        return self.optimise(set_hyper_params)[1]
 
 
 class HyperXNES(HyperOptimiser):
@@ -80,13 +84,15 @@ class HyperXNES(HyperOptimiser):
         return 1
 
     def bounds(self):
-        suggest = self.optimiser().suggested_population_size()
-        return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(1, 10*suggest)}]
+        suggest = self.optimiser(np.zeros(self.model().n_parameters())).suggested_population_size()
+        return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(2, 10*suggest)}]
 
     def __call__(self, x):
         print('calling XNES with', x)
-        self.optimiser.set_population_size(x)
-        return super(HyperXNES, self)()[1]
+
+        def set_hyper_params(opt):
+            opt.set_population_size(x)
+        return self.optimise(set_hyper_params)[1]
 
 
 class HyperSNES(HyperOptimiser):
@@ -97,19 +103,21 @@ class HyperSNES(HyperOptimiser):
         return 1
 
     def bounds(self):
-        suggest = self.optimiser().suggested_population_size()
-        return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(1, 10*suggest)}]
+        suggest = self.optimiser(np.zeros(self.model().n_parameters())).suggested_population_size()
+        return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(2, 10*suggest)}]
 
     def __call__(self, x):
         print('calling SNES with', x)
-        self.optimiser.set_population_size(x)
-        return super(HyperSNES, self)()[1]
+
+        def set_hyper_params(opt):
+            opt.set_population_size(x)
+        return self.optimise(set_hyper_params)[1]
 
 
 hyper_optimisers = [HyperCMAES, HyperPSO, HyperXNES, HyperSNES]
 
 
-class HyperMCMC(HyperOptimiser):
+class HyperMCMC(HyperSampler):
     def __init__(self, model, noise, times, real_parameters, lower, upper):
         super(HyperMCMC, self).__init__(pints.MetropolisRandomWalkMCMC, model, noise, times, real_parameters, lower, upper)
 
@@ -121,10 +129,14 @@ class HyperMCMC(HyperOptimiser):
 
     def __call__(self, x):
         print('calling MCMC with', x)
-        return super(HyperCMAES, self)()[1]
+
+        def set_hyper_params(opt):
+            print('do nothing')
+
+        return self.sample(set_hyper_params)[1]
 
 
-class HyperAdaptiveMCMC(HyperOptimiser):
+class HyperAdaptiveMCMC(HyperSampler):
     def __init__(self, model, noise, times, real_parameters, lower, upper):
         super(HyperAdaptiveMCMC, self).__init__(pints.AdaptiveCovarianceMCMC, model, noise, times, real_parameters, lower, upper)
 
@@ -136,10 +148,14 @@ class HyperAdaptiveMCMC(HyperOptimiser):
 
     def __call__(self, x):
         print('calling Adapt MCMC with', x)
-        return super(HyperAdaptiveMCMC, self)()[1]
+
+        def set_hyper_params(opt):
+            print('do nothing')
+
+        return self.sample(set_hyper_params)[1]
 
 
-class HyperDifferentialEvolutionMCMC(HyperOptimiser):
+class HyperDifferentialEvolutionMCMC(HyperSampler):
     def __init__(self, model, noise, times, real_parameters, lower, upper):
         super(HyperDifferentialEvolutionMCMC, self).__init__(pints.DifferentialEvolutionMCMC, model, noise, times, real_parameters, lower, upper)
 
@@ -147,15 +163,20 @@ class HyperDifferentialEvolutionMCMC(HyperOptimiser):
         return 2
 
     def bounds(self):
-        return [{'name': 'gamma', 'type': 'continuous', 'domain': (0, 20.38/np.sqrt(2*self.model.n_parameters()))},
+        return [{'name': 'gamma', 'type': 'continuous', 'domain': (0, 20.38/np.sqrt(2*self.model().n_parameters()))},
                 {'name': 'normal_scale', 'type': 'continuous', 'domain': (0, 1)}]
 
     def __call__(self, x):
         print('calling diff evolution MCMC with', x)
-        return super(HyperDifferentialEvolutionMCMC, self)()[1]
+
+        def set_hyper_params(opt):
+            opt.set_gamma(x[0, 0])
+            opt.set_normal_scale_coefficient(x[0, 1])
+
+        return self.sample(set_hyper_params)[1]
 
 
-class HyperPopulationMCMC(HyperOptimiser):
+class HyperPopulationMCMC(HyperSampler):
     def __init__(self, model, noise, times, real_parameters, lower, upper):
         super(HyperPopulationMCMC, self).__init__(pints.PopulationMCMC, model, noise, times, real_parameters, lower, upper)
 
@@ -167,7 +188,10 @@ class HyperPopulationMCMC(HyperOptimiser):
 
     def __call__(self, x):
         print('calling pop MCMC with', x)
-        return super(HyperPopulationMCMC, self)()[1]
+
+        def set_hyper_params(opt):
+            print('do nothing')
+        return self.sample(set_hyper_params)[1]
 
 
 hyper_mcmcs = [HyperMCMC, HyperAdaptiveMCMC, HyperDifferentialEvolutionMCMC, HyperPopulationMCMC]
@@ -202,8 +226,8 @@ if __name__ == "__main__":
         nm = i % len(models)
         print('running matrix (%d,%d,%d)' % (nm, no, ni))
         if no >= len(hyper_optimisers):
-            output = mcmc_sampler(num_samples, hyper_mcmcs[no - len(hyper_optimisers)], models[nm],
-                                  noise_levels[ni], times[nm], parameters[nm], lower[nm], upper[nm])
+            output = mcmc_sampler(num_samples, hyper_mcmcs[no - len(hyper_optimisers)](models[nm],
+                                                                                       noise_levels[ni], times[nm], parameters[nm], lower[nm], upper[nm]))
         else:
             output = optimise_sampler(num_samples, hyper_optimisers[no](models[nm],
                                                                         noise_levels[ni], times[nm], parameters[nm], lower[nm], upper[nm]))
