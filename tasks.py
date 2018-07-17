@@ -5,6 +5,7 @@ from timeit import default_timer as timer
 import multiprocessing
 from itertools import repeat
 from GPyOpt.methods import BayesianOptimization
+import os
 
 
 class HyperOptimiser:
@@ -121,6 +122,7 @@ def optimise(sample_num, hyper, x):
 def optimise_sampler(num_samples, max_tuning_runs, hyper):
     # tune hyper
     if (hyper.n_parameters() > 0):
+        #myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds(), num_cores=os.environ['OMP_NUM_THREADS'])
         myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds())
         myBopt.run_optimization(max_iter=max_tuning_runs)
         x_opt = myBopt.x_opt
@@ -142,6 +144,7 @@ def sample(sample_num, hyper, x):
 def mcmc_sampler(num_samples, max_tuning_runs, hyper):
     # tune hyper
     if (hyper.n_parameters() > 0):
+        #myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds(), num_cores=os.environ['OMP_NUM_THREADS'])
         myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds())
         myBopt.run_optimization(max_iter=max_tuning_runs)
         x_opt = myBopt.x_opt
