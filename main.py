@@ -11,28 +11,31 @@ import numpy as np
 
 
 models = [pints.toy.LogisticModel, pints.toy.HodgkinHuxleyIKModel,
-          pints.toy.GoodwinOscillatorModel]
-
+          pints.toy.GoodwinOscillatorModel, pints.toy.FitzhughNagumoModel,
+          pints.toy.Hes1Model, pints.toy.LotkaVolterraModel, pints.toy.RepressilatorModel,
+          pints.toy.SIRModel]
 
 analytic_models = [pints.toy.RosenbrockLogPDF,
                    pints.toy.TwistedGaussianLogPDF,
                    pints.toy.MultimodalNormalLogPDF,
                    pints.toy.HighDimensionalNormalLogPDF]
-parameters = [pints.toy.LogisticModel().suggested_parameters(),
-              pints.toy.HodgkinHuxleyIKModel().suggested_parameters(),
-              pints.toy.GoodwinOscillatorModel().suggested_parameters()]
-lower = [[p / 10.0 for p in parameters[0]],
-         [p / 10.0 for p in parameters[1]], [p / 10.0 for p in parameters[2]]]
-upper = [[p * 10.0 for p in parameters[0]],
-         [p * 10.0 for p in parameters[1]], [p * 10.0 for p in parameters[2]]]
-times = [pints.toy.LogisticModel().suggested_times(),
-         pints.toy.HodgkinHuxleyIKModel().suggested_times(),
-         pints.toy.GoodwinOscillatorModel().suggested_times()]
+
+parameters = [m().suggested_parameters() for m in models]
+
+lower = [[p / 10.0 for p in all_p] for all_p in parameters]
+upper = [[p * 10.0 for p in all_p] for all_p in parameters]
+
+times = [m().suggested_times() for m in models]
+
 optimisers = [pints.CMAES, pints.PSO, pints.XNES, pints.SNES]
+
 mcmcs = [pints.MetropolisRandomWalkMCMC,
          pints.AdaptiveCovarianceMCMC, pints.DifferentialEvolutionMCMC, pints.PopulationMCMC]
+
 noise_levels = [0.01, 0.1]
+
 num_samples = 20
+max_tuning_runs = 20
 
 
 class HyperCMAES(HyperOptimiser):
@@ -47,12 +50,16 @@ class HyperCMAES(HyperOptimiser):
         suggest = self.optimiser(np.zeros(self.model().n_parameters())).suggested_population_size()
         return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(2, 10*suggest)}]
 
-    def __call__(self, x):
+    def run(self, x):
+        x = x.reshape(self.n_parameters())
         print('calling CMAES with', x)
 
         def set_hyper_params(opt):
             opt.set_population_size(x[0])
-        return self.optimise(set_hyper_params)[1]
+        return self.optimise(set_hyper_params)
+
+    def __call__(self, x):
+        return self.run(x)[1]
 
 
 class HyperPSO(HyperOptimiser):
@@ -67,13 +74,17 @@ class HyperPSO(HyperOptimiser):
         return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(2, 10*suggest)},
                 {'name': 'balance', 'type': 'continuous', 'domain': (0, 1)}]
 
-    def __call__(self, x):
+    def run(self, x):
+        x = x.reshape(self.n_parameters())
         print('calling PSE with', x)
 
         def set_hyper_params(opt):
             opt.set_population_size(x[0])
             opt.set_local_global_balance(x[1])
-        return self.optimise(set_hyper_params)[1]
+        return self.optimise(set_hyper_params)
+
+    def __call__(self, x):
+        return self.run(x)[1]
 
 
 class HyperXNES(HyperOptimiser):
@@ -87,12 +98,16 @@ class HyperXNES(HyperOptimiser):
         suggest = self.optimiser(np.zeros(self.model().n_parameters())).suggested_population_size()
         return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(2, 10*suggest)}]
 
-    def __call__(self, x):
+    def run(self, x):
+        x = x.reshape(self.n_parameters())
         print('calling XNES with', x)
 
         def set_hyper_params(opt):
             opt.set_population_size(x)
-        return self.optimise(set_hyper_params)[1]
+        return self.optimise(set_hyper_params)
+
+    def __call__(self, x):
+        return self.run(x)[1]
 
 
 class HyperSNES(HyperOptimiser):
@@ -106,12 +121,16 @@ class HyperSNES(HyperOptimiser):
         suggest = self.optimiser(np.zeros(self.model().n_parameters())).suggested_population_size()
         return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(2, 10*suggest)}]
 
-    def __call__(self, x):
+    def run(self, x):
+        x = x.reshape(self.n_parameters())
         print('calling SNES with', x)
 
         def set_hyper_params(opt):
             opt.set_population_size(x)
-        return self.optimise(set_hyper_params)[1]
+        return self.optimise(set_hyper_params)
+
+    def __call__(self, x):
+        return self.run(x)[1]
 
 
 hyper_optimisers = [HyperCMAES, HyperPSO, HyperXNES, HyperSNES]
@@ -127,13 +146,16 @@ class HyperMCMC(HyperSampler):
     def bounds(self):
         return None
 
-    def __call__(self, x):
+    def run(self, x):
         print('calling MCMC with', x)
 
         def set_hyper_params(opt):
             print('do nothing')
 
-        return self.sample(set_hyper_params)[1]
+        return self.sample(set_hyper_params)
+
+    def __call__(self, x):
+        return self.run(x)[1]
 
 
 class HyperAdaptiveMCMC(HyperSampler):
@@ -146,13 +168,16 @@ class HyperAdaptiveMCMC(HyperSampler):
     def bounds(self):
         return None
 
-    def __call__(self, x):
+    def run(self, x):
         print('calling Adapt MCMC with', x)
 
         def set_hyper_params(opt):
             print('do nothing')
 
-        return self.sample(set_hyper_params)[1]
+        return self.sample(set_hyper_params)
+
+    def __call__(self, x):
+        return self.run(x)[1]
 
 
 class HyperDifferentialEvolutionMCMC(HyperSampler):
@@ -166,14 +191,18 @@ class HyperDifferentialEvolutionMCMC(HyperSampler):
         return [{'name': 'gamma', 'type': 'continuous', 'domain': (0, 20.38/np.sqrt(2*self.model().n_parameters()))},
                 {'name': 'normal_scale', 'type': 'continuous', 'domain': (0, 1)}]
 
-    def __call__(self, x):
+    def run(self, x):
+        x = x.reshape(self.n_parameters())
         print('calling diff evolution MCMC with', x)
 
         def set_hyper_params(opt):
-            opt.set_gamma(x[0, 0])
-            opt.set_normal_scale_coefficient(x[0, 1])
+            opt.set_gamma(x[0])
+            opt.set_normal_scale_coefficient(x[1])
 
-        return self.sample(set_hyper_params)[1]
+        return self.sample(set_hyper_params)
+
+    def __call__(self, x):
+        return self.run(x)[1]
 
 
 class HyperPopulationMCMC(HyperSampler):
@@ -186,12 +215,16 @@ class HyperPopulationMCMC(HyperSampler):
     def bounds(self):
         return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(1, 20)}]
 
-    def __call__(self, x):
+    def run(self, x):
+        x = x.reshape(self.n_parameters())
         print('calling pop MCMC with', x)
 
         def set_hyper_params(opt):
             print('do nothing')
-        return self.sample(set_hyper_params)[1]
+        return self.sample(set_hyper_params)
+
+    def __call__(self, x):
+        return self.run(x)[1]
 
 
 hyper_mcmcs = [HyperMCMC, HyperAdaptiveMCMC, HyperDifferentialEvolutionMCMC, HyperPopulationMCMC]
@@ -226,11 +259,11 @@ if __name__ == "__main__":
         nm = i % len(models)
         print('running matrix (%d,%d,%d)' % (nm, no, ni))
         if no >= len(hyper_optimisers):
-            output = mcmc_sampler(num_samples, hyper_mcmcs[no - len(hyper_optimisers)](models[nm],
-                                                                                       noise_levels[ni], times[nm], parameters[nm], lower[nm], upper[nm]))
+            output = mcmc_sampler(num_samples, max_tuning_runs, hyper_mcmcs[no - len(hyper_optimisers)](models[nm],
+                                                                                                        noise_levels[ni], times[nm], parameters[nm], lower[nm], upper[nm]))
         else:
-            output = optimise_sampler(num_samples, hyper_optimisers[no](models[nm],
-                                                                        noise_levels[ni], times[nm], parameters[nm], lower[nm], upper[nm]))
+            output = optimise_sampler(num_samples, max_tuning_runs, hyper_optimisers[no](models[nm],
+                                                                                         noise_levels[ni], times[nm], parameters[nm], lower[nm], upper[nm]))
         fname = 'output_%d_%d_%d.pickle' % (nm, no, ni)
         print('writing ' + fname)
         pickle.dump(output, open(fname, 'wb'))
@@ -240,7 +273,7 @@ if __name__ == "__main__":
                 for no, optimiser in enumerate(hyper_optimisers):
                     print('running matrix (%d,%d,%d)' % (nm, no, ni))
                     try:
-                        output = optimise_sampler(num_samples, optimiser[no](optimiser, model, noise, times[nm], parameters[nm], lower[nm], upper[nm]))
+                        output = optimise_sampler(num_samples, max_tuning_runs, optimiser[no](optimiser, model, noise, times[nm], parameters[nm], lower[nm], upper[nm]))
                         fname = 'output_%d_%d_%d.pickle' % (nm, no, ni)
                         print('writing ' + fname)
                         pickle.dump(output, open(fname, 'wb'))
@@ -249,7 +282,7 @@ if __name__ == "__main__":
                 for no, mcmc in enumerate(hyper_mcmcs):
                     print('running matrix (%d,%d,%d)' % (nm, no, ni))
                     try:
-                        output = mcmc_sampler(num_samples, optimiser(
+                        output = mcmc_sampler(num_samples, max_tuning_runs, optimiser(
                                               model, noise, times[nm],
                                               parameters[nm], lower[nm], upper[nm]))
                         fname = 'output_%d_%d_%d.pickle' % (

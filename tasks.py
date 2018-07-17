@@ -19,13 +19,15 @@ class HyperOptimiser:
 
     def optimise(self, set_hyper_params):
         the_model = self.model()
+        print('model = ', the_model)
         values = the_model.simulate(self.real_parameters, self.times)
         value_range = np.max(values) - np.min(values)
         values += np.random.normal(0, self.noise * value_range, values.shape)
-        problem = pints.SingleOutputProblem(the_model, self.times, values)
+        problem = pints.MultiOutputProblem(the_model, self.times, values)
         score = pints.SumOfSquaresError(problem)
         middle = [0.5 * (u + l) for l, u in zip(self.lower, self.upper)]
-        sigma = [u - l for l, u in zip(self.lower, self.upper)]
+        sigma = [(1.0/6.0)*(u - l) for l, u in zip(self.lower, self.upper)]
+        print('sigma = ', sigma)
         boundaries = pints.Boundaries(self.lower, self.upper)
 
         optimisation = pints.Optimisation(
@@ -78,10 +80,10 @@ class HyperSampler:
         values = the_model.simulate(self.real_parameters, self.times)
         value_range = np.max(values) - np.min(values)
         values += np.random.normal(0, self.noise * value_range, values.shape)
-        problem = pints.SingleOutputProblem(the_model, self.times, values)
+        problem = pints.MultiOutputProblem(the_model, self.times, values)
         log_likelihood = pints.UnknownNoiseLogLikelihood(problem)
-        lower = list(self.lower) + [value_range * self.noise / 10.0]
-        upper = list(self.upper) + [value_range * self.noise * 10]
+        lower = list(self.lower) + [value_range * self.noise / 10.0]*the_model.n_outputs()
+        upper = list(self.upper) + [value_range * self.noise * 10]*the_model.n_outputs()
         middle = [0.5 * (u + l) for l, u in zip(lower, upper)]
         sigma = [u - l for l, u in zip(lower, upper)]
         log_prior = pints.UniformLogPrior(lower, upper)
@@ -113,14 +115,14 @@ class HyperSampler:
 
 def optimise(sample_num, hyper, x):
     print('optimise for sample', sample_num)
-    hyper(x)
+    hyper.run(x)
 
 
-def optimise_sampler(num_samples, hyper):
+def optimise_sampler(num_samples, max_tuning_runs, hyper):
     # tune hyper
     if (hyper.n_parameters() > 0):
         myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds())
-        myBopt.run_optimization(max_iter=num_samples)
+        myBopt.run_optimization(max_iter=max_tuning_runs)
         x_opt = myBopt.x_opt
     else:
         x_opt = []
@@ -134,14 +136,14 @@ def optimise_sampler(num_samples, hyper):
 
 def sample(sample_num, hyper, x):
     print('sampling for sample', sample_num)
-    hyper(x)
+    hyper.run(x)
 
 
-def mcmc_sampler(num_samples, hyper):
+def mcmc_sampler(num_samples, max_tuning_runs, hyper):
     # tune hyper
     if (hyper.n_parameters() > 0):
         myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds())
-        myBopt.run_optimization(max_iter=num_samples)
+        myBopt.run_optimization(max_iter=max_tuning_runs)
         x_opt = myBopt.x_opt
     else:
         x_opt = []
