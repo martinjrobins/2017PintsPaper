@@ -7,8 +7,8 @@ rm -rf $dir
 mkdir $dir
 cd $dir
 module load git
-git clone git@github.com:martinjrobins/2017PintsPaper.git
-cd 2017PintsPaper
+git clone git@github.com:pints-team/performance-testing.git
+cd performance-testing
 git clone https://github.com/pints-team/pints.git pints_repo
 mv pints_repo/pints .
 module load python/3.5
