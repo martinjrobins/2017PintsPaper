@@ -298,7 +298,7 @@ if __name__ == "__main__":
         y = range(len(models))
         y_labels = [m.__name__ for m in models]
         x = range(len(hyper_optimisers))
-        x_labels = [o.optimiser.__name__ for o in hyper_optimisers]
+        x_labels = [o.__name__ for o in hyper_optimisers]
         x_mcmc = range(len(hyper_mcmcs))
         x_mcmc_labels = [m.__name__ for m in hyper_mcmcs]
         for ni, noise in enumerate(noise_levels):

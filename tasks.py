@@ -116,7 +116,7 @@ class HyperSampler:
 
 def optimise(sample_num, hyper, x):
     print('optimise for sample', sample_num)
-    hyper.run(x)
+    return hyper.run(x)
 
 
 def optimise_sampler(num_samples, max_tuning_runs, hyper):
@@ -138,7 +138,7 @@ def optimise_sampler(num_samples, max_tuning_runs, hyper):
 
 def sample(sample_num, hyper, x):
     print('sampling for sample', sample_num)
-    hyper.run(x)
+    return hyper.run(x)
 
 
 def mcmc_sampler(num_samples, max_tuning_runs, hyper):
