@@ -1,5 +1,5 @@
 import pints
-from tasks import optimise_sampler, mcmc_sampler
+from tasks import HyperOptimiser, HyperSampler, optimise_sampler, mcmc_sampler
 import argparse
 from math import floor
 from subprocess import call
@@ -9,31 +9,227 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 
-models = [pints.toy.LogisticModel, pints.toy.FitzhughNagumoModel,
-          pints.toy.HodgkinHuxleyIKModel, pints.toy.LotkaVolterraModel,
-          pints.toy.GoodwinOscillatorModel]
+
+
+models = [pints.toy.LogisticModel, pints.toy.HodgkinHuxleyIKModel,
+          pints.toy.GoodwinOscillatorModel, pints.toy.FitzhughNagumoModel,
+          pints.toy.Hes1Model, pints.toy.LotkaVolterraModel, pints.toy.RepressilatorModel,
+          pints.toy.SIRModel]
+
 analytic_models = [pints.toy.RosenbrockLogPDF,
                    pints.toy.TwistedGaussianLogPDF,
                    pints.toy.MultimodalNormalLogPDF,
                    pints.toy.HighDimensionalNormalLogPDF]
-parameters = [[0.015, 500.0],
-              pints.toy.FitzhughNagumoModel().suggested_parameters(),
-              pints.toy.HodgkinHuxleyIKModel().suggested_parameters(),
-              pints.toy.LotkaVolterraModel().suggested_parameters(),
-              pints.toy.GoodwinOscillatorModel().suggested_parameters()]
-lower = [[p / 10.0 for p in parameters[0]],
-         [p / 10.0 for p in parameters[1]], [p / 10.0 for p in parameters[2]]]
-upper = [[p * 10.0 for p in parameters[0]],
-         [p * 10.0 for p in parameters[1]], [p * 10.0 for p in parameters[2]]]
-times = [np.linspace(0, 1000, 1000),
-         pints.toy.HodgkinHuxleyIKModel().suggested_times(),
-         pints.toy.GoodwinOscillatorModel().suggested_times()]
+
+parameters = [m().suggested_parameters() for m in models]
+
+lower = [[p / 10.0 for p in all_p] for all_p in parameters]
+upper = [[p * 10.0 for p in all_p] for all_p in parameters]
+
+times = [m().suggested_times() for m in models]
+
 optimisers = [pints.CMAES, pints.PSO, pints.XNES, pints.SNES]
+
 mcmcs = [pints.MetropolisRandomWalkMCMC,
-         pints.AdaptiveCovarianceMCMC, pints.DifferentialEvolutionMCMC,
-         pints.PopulationMCMC]
+         pints.AdaptiveCovarianceMCMC, pints.DifferentialEvolutionMCMC, pints.PopulationMCMC]
+
 noise_levels = [0.01, 0.1]
+
 num_samples = 20
+max_tuning_runs = 20
+
+
+class HyperCMAES(HyperOptimiser):
+
+    def __init__(self, model, noise, times, real_parameters, lower, upper):
+        super(HyperCMAES, self).__init__(pints.CMAES, model, noise, times, real_parameters, lower, upper)
+
+    def n_parameters(self):
+        return 1
+
+    def bounds(self):
+        suggest = self.optimiser(np.zeros(self.model().n_parameters())).suggested_population_size()
+        return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(2, 10*suggest)}]
+
+    def run(self, x):
+        x = x.reshape(self.n_parameters())
+        print('calling CMAES with', x)
+
+        def set_hyper_params(opt):
+            opt.set_population_size(x[0])
+        return self.optimise(set_hyper_params)
+
+    def __call__(self, x):
+        return self.run(x)[1]
+
+
+class HyperPSO(HyperOptimiser):
+    def __init__(self, model, noise, times, real_parameters, lower, upper):
+        super(HyperPSO, self).__init__(pints.PSO, model, noise, times, real_parameters, lower, upper)
+
+    def n_parameters(self):
+        return 2
+
+    def bounds(self):
+        suggest = self.optimiser(np.zeros(self.model().n_parameters())).suggested_population_size()
+        return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(2, 10*suggest)},
+                {'name': 'balance', 'type': 'continuous', 'domain': (0, 1)}]
+
+    def run(self, x):
+        x = x.reshape(self.n_parameters())
+        print('calling PSE with', x)
+
+        def set_hyper_params(opt):
+            opt.set_population_size(x[0])
+            opt.set_local_global_balance(x[1])
+        return self.optimise(set_hyper_params)
+
+    def __call__(self, x):
+        return self.run(x)[1]
+
+
+class HyperXNES(HyperOptimiser):
+    def __init__(self, model, noise, times, real_parameters, lower, upper):
+        super(HyperXNES, self).__init__(pints.XNES, model, noise, times, real_parameters, lower, upper)
+
+    def n_parameters(self):
+        return 1
+
+    def bounds(self):
+        suggest = self.optimiser(np.zeros(self.model().n_parameters())).suggested_population_size()
+        return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(2, 10*suggest)}]
+
+    def run(self, x):
+        x = x.reshape(self.n_parameters())
+        print('calling XNES with', x)
+
+        def set_hyper_params(opt):
+            opt.set_population_size(x)
+        return self.optimise(set_hyper_params)
+
+    def __call__(self, x):
+        return self.run(x)[1]
+
+
+class HyperSNES(HyperOptimiser):
+    def __init__(self, model, noise, times, real_parameters, lower, upper):
+        super(HyperSNES, self).__init__(pints.SNES, model, noise, times, real_parameters, lower, upper)
+
+    def n_parameters(self):
+        return 1
+
+    def bounds(self):
+        suggest = self.optimiser(np.zeros(self.model().n_parameters())).suggested_population_size()
+        return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(2, 10*suggest)}]
+
+    def run(self, x):
+        x = x.reshape(self.n_parameters())
+        print('calling SNES with', x)
+
+        def set_hyper_params(opt):
+            opt.set_population_size(x)
+        return self.optimise(set_hyper_params)
+
+    def __call__(self, x):
+        return self.run(x)[1]
+
+
+hyper_optimisers = [HyperCMAES, HyperPSO, HyperXNES, HyperSNES]
+
+
+class HyperMCMC(HyperSampler):
+    def __init__(self, model, noise, times, real_parameters, lower, upper):
+        super(HyperMCMC, self).__init__(pints.MetropolisRandomWalkMCMC, model, noise, times, real_parameters, lower, upper)
+
+    def n_parameters(self):
+        return 0
+
+    def bounds(self):
+        return None
+
+    def run(self, x):
+        print('calling MCMC with', x)
+
+        def set_hyper_params(opt):
+            print('do nothing')
+
+        return self.sample(set_hyper_params)
+
+    def __call__(self, x):
+        return self.run(x)[1]
+
+
+class HyperAdaptiveMCMC(HyperSampler):
+    def __init__(self, model, noise, times, real_parameters, lower, upper):
+        super(HyperAdaptiveMCMC, self).__init__(pints.AdaptiveCovarianceMCMC, model, noise, times, real_parameters, lower, upper)
+
+    def n_parameters(self):
+        return 0
+
+    def bounds(self):
+        return None
+
+    def run(self, x):
+        print('calling Adapt MCMC with', x)
+
+        def set_hyper_params(opt):
+            print('do nothing')
+
+        return self.sample(set_hyper_params)
+
+    def __call__(self, x):
+        return self.run(x)[1]
+
+
+class HyperDifferentialEvolutionMCMC(HyperSampler):
+    def __init__(self, model, noise, times, real_parameters, lower, upper):
+        super(HyperDifferentialEvolutionMCMC, self).__init__(pints.DifferentialEvolutionMCMC, model, noise, times, real_parameters, lower, upper)
+
+    def n_parameters(self):
+        return 2
+
+    def bounds(self):
+        return [{'name': 'gamma', 'type': 'continuous', 'domain': (0, 20.38/np.sqrt(2*self.model().n_parameters()))},
+                {'name': 'normal_scale', 'type': 'continuous', 'domain': (0, 1)}]
+
+    def run(self, x):
+        x = x.reshape(self.n_parameters())
+        print('calling diff evolution MCMC with', x)
+
+        def set_hyper_params(opt):
+            opt.set_gamma(x[0])
+            opt.set_normal_scale_coefficient(x[1])
+
+        return self.sample(set_hyper_params)
+
+    def __call__(self, x):
+        return self.run(x)[1]
+
+
+class HyperPopulationMCMC(HyperSampler):
+    def __init__(self, model, noise, times, real_parameters, lower, upper):
+        super(HyperPopulationMCMC, self).__init__(pints.PopulationMCMC, model, noise, times, real_parameters, lower, upper)
+
+    def n_parameters(self):
+        return 1
+
+    def bounds(self):
+        return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(1, 20)}]
+
+    def run(self, x):
+        x = x.reshape(self.n_parameters())
+        print('calling pop MCMC with', x)
+
+        def set_hyper_params(opt):
+            print('do nothing')
+        return self.sample(set_hyper_params)
+
+    def __call__(self, x):
+        return self.run(x)[1]
+
+
+hyper_mcmcs = [HyperMCMC, HyperAdaptiveMCMC, HyperDifferentialEvolutionMCMC, HyperPopulationMCMC]
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run matrix.')
@@ -49,7 +245,7 @@ if __name__ == "__main__":
                         help='run entire matrix')
 
     args = parser.parse_args()
-    size = len(models) * (len(optimisers) + len(mcmcs)) * len(noise_levels)
+    size = len(models) * (len(hyper_optimisers) + len(hyper_mcmcs)) * len(noise_levels)
 
     if args.max:
         print(size - 1)
@@ -59,41 +255,39 @@ if __name__ == "__main__":
         i = args.integer
         ni = i % len(noise_levels)
         i = int(floor(i / len(noise_levels)))
-        no = i % (len(optimisers) + len(mcmcs))
-        i = int(floor(i / (len(optimisers) + len(mcmcs))))
+        no = i % (len(hyper_optimisers) + len(hyper_mcmcs))
+        i = int(floor(i / (len(hyper_optimisers) + len(hyper_mcmcs))))
         nm = i % len(models)
         print('running matrix (%d,%d,%d)' % (nm, no, ni))
-        if no >= len(optimisers):
-            output = mcmc_sampler(num_samples, mcmcs[no - len(optimisers)], models[nm],
-                                  noise_levels[ni], times[nm], parameters[nm], lower[nm], upper[nm])
+        if no >= len(hyper_optimisers):
+            output = mcmc_sampler(num_samples, max_tuning_runs, hyper_mcmcs[no - len(hyper_optimisers)](models[nm],
+                                                                                                        noise_levels[ni], times[nm], parameters[nm], lower[nm], upper[nm]))
         else:
-            output = optimise_sampler(num_samples, optimisers[no], models[nm],
-                                      noise_levels[ni], times[nm], parameters[nm], lower[nm], upper[nm])
+            output = optimise_sampler(num_samples, max_tuning_runs, hyper_optimisers[no](models[nm],
+                                                                                         noise_levels[ni], times[nm], parameters[nm], lower[nm], upper[nm]))
         fname = 'output_%d_%d_%d.pickle' % (nm, no, ni)
         print('writing ' + fname)
         pickle.dump(output, open(fname, 'wb'))
     elif args.all:
         for ni, noise in enumerate(noise_levels):
             for nm, model in enumerate(models):
-                for no, optimiser in enumerate(optimisers):
+                for no, optimiser in enumerate(hyper_optimisers):
                     print('running matrix (%d,%d,%d)' % (nm, no, ni))
                     try:
-                        output = optimise_sampler(num_samples, optimiser,
-                                                  model, noise, times[nm],
-                                                  parameters[nm], lower[nm], upper[nm])
+                        output = optimise_sampler(num_samples, max_tuning_runs, optimiser[no](optimiser, model, noise, times[nm], parameters[nm], lower[nm], upper[nm]))
                         fname = 'output_%d_%d_%d.pickle' % (nm, no, ni)
                         print('writing ' + fname)
                         pickle.dump(output, open(fname, 'wb'))
                     except Exception:
                         pass
-                for no, mcmc in enumerate(mcmcs):
+                for no, mcmc in enumerate(hyper_mcmcs):
                     print('running matrix (%d,%d,%d)' % (nm, no, ni))
                     try:
-                        output = mcmc_sampler(num_samples, optimiser,
+                        output = mcmc_sampler(num_samples, max_tuning_runs, optimiser(
                                               model, noise, times[nm],
-                                              parameters[nm], lower[nm], upper[nm])
+                                              parameters[nm], lower[nm], upper[nm]))
                         fname = 'output_%d_%d_%d.pickle' % (
-                            nm, no + len(optimisers), ni)
+                            nm, no + len(hyper_optimisers), ni)
                         print('writing ' + fname)
                         pickle.dump(output, open(fname, 'wb'))
                     except Exception:
@@ -103,18 +297,18 @@ if __name__ == "__main__":
         f = plt.figure()
         y = range(len(models))
         y_labels = [m.__name__ for m in models]
-        x = range(len(optimisers))
-        x_labels = [o.__name__ for o in optimisers]
-        x_mcmc = range(len(mcmcs))
-        x_mcmc_labels = [m.__name__ for m in mcmcs]
+        x = range(len(hyper_optimisers))
+        x_labels = [o.optimiser.__name__ for o in hyper_optimisers]
+        x_mcmc = range(len(hyper_mcmcs))
+        x_mcmc_labels = [m.__name__ for m in hyper_mcmcs]
         for ni, noise in enumerate(noise_levels):
-            score = np.zeros((len(models), len(optimisers), num_samples))
-            time = np.zeros((len(models), len(optimisers), num_samples))
-            rhat = np.zeros((len(models), len(mcmcs), num_samples))
-            ess = np.zeros((len(models), len(mcmcs), num_samples))
-            time_mcmc = np.zeros((len(models), len(mcmcs), num_samples))
+            score = np.zeros((len(models), len(hyper_optimisers), num_samples))
+            time = np.zeros((len(models), len(hyper_optimisers), num_samples))
+            rhat = np.zeros((len(models), len(hyper_mcmcs), num_samples))
+            ess = np.zeros((len(models), len(hyper_mcmcs), num_samples))
+            time_mcmc = np.zeros((len(models), len(hyper_mcmcs), num_samples))
             for nm, model in enumerate(models):
-                for no, optimiser in enumerate(optimisers):
+                for no, optimiser in enumerate(hyper_optimisers):
                     fname = 'output_%d_%d_%d.pickle' % (
                         nm, no, ni)
                     print('reading ' + fname)
@@ -126,9 +320,9 @@ if __name__ == "__main__":
                     else:
                         score[nm, no, :] = float('nan')
                         time[nm, no, :] = float('nan')
-                for no, mcmc in enumerate(mcmcs):
+                for no, mcmc in enumerate(hyper_mcmcs):
                     fname = 'output_%d_%d_%d.pickle' % (
-                        nm, no + len(optimisers), ni)
+                        nm, no + len(hyper_optimisers), ni)
                     print('reading ' + fname)
                     if os.path.exists(fname):
                         output = pickle.load(open(fname, 'rb'))
