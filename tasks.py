@@ -6,6 +6,7 @@ import multiprocessing
 from itertools import repeat
 from GPyOpt.methods import BayesianOptimization
 import os
+import math
 
 
 class HyperOptimiser:
@@ -18,7 +19,7 @@ class HyperOptimiser:
         self.lower = lower
         self.upper = upper
 
-    def optimise(self, set_hyper_params):
+    def optimise(self, set_hyper_params, parallel=False):
         the_model = self.model()
         print('model = ', the_model)
         values = the_model.simulate(self.real_parameters, self.times)
@@ -39,6 +40,8 @@ class HyperOptimiser:
             method=self.optimiser
         )
         set_hyper_params(optimisation.optimiser())
+        if parallel:
+            optimisation.set_parallel(int(os.environ['OMP_NUM_THREADS']))
 
         start = timer()
         found_parameters, found_value = optimisation.run()
@@ -108,9 +111,9 @@ class HyperSampler:
         for chain in chains:
             ess += pints._diagnostics.effective_sample_size(chain)
         ess = np.min(ess)
-        print(rhat)
-        print(ess)
-        print(end - start)
+        print('rhat:', rhat)
+        print('ess:', ess)
+        print('time:', end - start)
         return rhat, ess, end - start
 
 
@@ -121,6 +124,7 @@ def optimise(sample_num, hyper, x):
 
 def optimise_sampler(num_samples, max_tuning_runs, hyper):
     # tune hyper
+    print("TUNING HYPER-PARAMETERS for hyper=", hyper)
     if (hyper.n_parameters() > 0):
         #myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds(), num_cores=os.environ['OMP_NUM_THREADS'])
         myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds())
@@ -130,7 +134,8 @@ def optimise_sampler(num_samples, max_tuning_runs, hyper):
         x_opt = []
 
         # take samples
-    p = multiprocessing.Pool(multiprocessing.cpu_count())
+    print("TAKING SAMPLES")
+    p = multiprocessing.Pool(int(os.environ['OMP_NUM_THREADS']))
     args = zip(range(num_samples), repeat(hyper), repeat(x_opt))
     results = p.starmap(optimise, args)
     return np.array(results)
@@ -143,6 +148,7 @@ def sample(sample_num, hyper, x):
 
 def mcmc_sampler(num_samples, max_tuning_runs, hyper):
     # tune hyper
+    print("TUNING HYPER-PARAMETERS for hyper=", hyper)
     if (hyper.n_parameters() > 0):
         #myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds(), num_cores=os.environ['OMP_NUM_THREADS'])
         myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds())
@@ -151,8 +157,8 @@ def mcmc_sampler(num_samples, max_tuning_runs, hyper):
     else:
         x_opt = []
 
-    p = multiprocessing.Pool(multiprocessing.cpu_count())
-
+    print("TAKING SAMPLES")
+    p = multiprocessing.Pool(int(os.environ['OMP_NUM_THREADS']))
     args = zip(range(num_samples), repeat(hyper), repeat(x_opt))
     results = p.starmap(sample, args)
     return np.array(results)

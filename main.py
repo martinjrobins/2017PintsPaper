@@ -1,3 +1,6 @@
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
 import pints
 from tasks import HyperOptimiser, HyperSampler, optimise_sampler, mcmc_sampler
 import argparse
@@ -6,9 +9,8 @@ from subprocess import call
 import os
 import sys
 import pickle
-import matplotlib.pyplot as plt
 import numpy as np
-
+import math
 
 
 models = [pints.toy.LogisticModel, pints.toy.HodgkinHuxleyIKModel,
@@ -51,16 +53,16 @@ class HyperCMAES(HyperOptimiser):
         suggest = self.optimiser(np.zeros(self.model().n_parameters())).suggested_population_size()
         return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(2, 10*suggest)}]
 
-    def run(self, x):
+    def run(self, x, parallel=False):
         x = x.reshape(self.n_parameters())
         print('calling CMAES with', x)
 
         def set_hyper_params(opt):
             opt.set_population_size(x[0])
-        return self.optimise(set_hyper_params)
+        return self.optimise(set_hyper_params, parallel=parallel)
 
     def __call__(self, x):
-        return self.run(x)[1]
+        return self.run(x, parallel=True)[1]
 
 
 class HyperPSO(HyperOptimiser):
@@ -75,17 +77,17 @@ class HyperPSO(HyperOptimiser):
         return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(2, 10*suggest)},
                 {'name': 'balance', 'type': 'continuous', 'domain': (0, 1)}]
 
-    def run(self, x):
+    def run(self, x, parallel=False):
         x = x.reshape(self.n_parameters())
         print('calling PSE with', x)
 
         def set_hyper_params(opt):
             opt.set_population_size(x[0])
             opt.set_local_global_balance(x[1])
-        return self.optimise(set_hyper_params)
+        return self.optimise(set_hyper_params, parallel=parallel)
 
     def __call__(self, x):
-        return self.run(x)[1]
+        return self.run(x, parallel=True)[1]
 
 
 class HyperXNES(HyperOptimiser):
@@ -99,16 +101,16 @@ class HyperXNES(HyperOptimiser):
         suggest = self.optimiser(np.zeros(self.model().n_parameters())).suggested_population_size()
         return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(2, 10*suggest)}]
 
-    def run(self, x):
+    def run(self, x, parallel=False):
         x = x.reshape(self.n_parameters())
         print('calling XNES with', x)
 
         def set_hyper_params(opt):
             opt.set_population_size(x)
-        return self.optimise(set_hyper_params)
+        return self.optimise(set_hyper_params, parallel=parallel)
 
     def __call__(self, x):
-        return self.run(x)[1]
+        return self.run(x, parallel=True)[1]
 
 
 class HyperSNES(HyperOptimiser):
@@ -122,16 +124,16 @@ class HyperSNES(HyperOptimiser):
         suggest = self.optimiser(np.zeros(self.model().n_parameters())).suggested_population_size()
         return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(2, 10*suggest)}]
 
-    def run(self, x):
+    def run(self, x, parallel=False):
         x = x.reshape(self.n_parameters())
         print('calling SNES with', x)
 
         def set_hyper_params(opt):
             opt.set_population_size(x)
-        return self.optimise(set_hyper_params)
+        return self.optimise(set_hyper_params, parallel=parallel)
 
     def __call__(self, x):
-        return self.run(x)[1]
+        return self.run(x, parallel=True)[1]
 
 
 hyper_optimisers = [HyperCMAES, HyperPSO, HyperXNES, HyperSNES]
@@ -147,7 +149,7 @@ class HyperMCMC(HyperSampler):
     def bounds(self):
         return None
 
-    def run(self, x):
+    def run(self, x, parallel=False):
         print('calling MCMC with', x)
 
         def set_hyper_params(opt):
@@ -156,7 +158,10 @@ class HyperMCMC(HyperSampler):
         return self.sample(set_hyper_params)
 
     def __call__(self, x):
-        return self.run(x)[1]
+        ess = self.run(x, parallel=True)[1]
+        if math.isnan(ess):
+            return math.inf
+        return 1.0/ess
 
 
 class HyperAdaptiveMCMC(HyperSampler):
@@ -169,7 +174,7 @@ class HyperAdaptiveMCMC(HyperSampler):
     def bounds(self):
         return None
 
-    def run(self, x):
+    def run(self, x, parallel=False):
         print('calling Adapt MCMC with', x)
 
         def set_hyper_params(opt):
@@ -178,7 +183,10 @@ class HyperAdaptiveMCMC(HyperSampler):
         return self.sample(set_hyper_params)
 
     def __call__(self, x):
-        return self.run(x)[1]
+        ess = self.run(x, parallel=True)[1]
+        if math.isnan(ess):
+            return math.inf
+        return 1.0/ess
 
 
 class HyperDifferentialEvolutionMCMC(HyperSampler):
@@ -192,7 +200,7 @@ class HyperDifferentialEvolutionMCMC(HyperSampler):
         return [{'name': 'gamma', 'type': 'continuous', 'domain': (0, 20.38/np.sqrt(2*self.model().n_parameters()))},
                 {'name': 'normal_scale', 'type': 'continuous', 'domain': (0, 1)}]
 
-    def run(self, x):
+    def run(self, x, parallel=False):
         x = x.reshape(self.n_parameters())
         print('calling diff evolution MCMC with', x)
 
@@ -203,7 +211,10 @@ class HyperDifferentialEvolutionMCMC(HyperSampler):
         return self.sample(set_hyper_params)
 
     def __call__(self, x):
-        return self.run(x)[1]
+        ess = self.run(x, parallel=True)[1]
+        if math.isnan(ess):
+            return math.inf
+        return 1.0/ess
 
 
 class HyperPopulationMCMC(HyperSampler):
@@ -216,16 +227,20 @@ class HyperPopulationMCMC(HyperSampler):
     def bounds(self):
         return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(1, 20)}]
 
-    def run(self, x):
+    def run(self, x, parallel=False):
         x = x.reshape(self.n_parameters())
         print('calling pop MCMC with', x)
 
         def set_hyper_params(opt):
             print('do nothing')
+
         return self.sample(set_hyper_params)
 
     def __call__(self, x):
-        return self.run(x)[1]
+        ess = self.run(x, parallel=True)[1]
+        if math.isnan(ess):
+            return math.inf
+        return 1.0/ess
 
 
 hyper_mcmcs = [HyperMCMC, HyperAdaptiveMCMC, HyperDifferentialEvolutionMCMC, HyperPopulationMCMC]
@@ -311,26 +326,34 @@ if __name__ == "__main__":
                 for no, optimiser in enumerate(hyper_optimisers):
                     fname = 'output_%d_%d_%d.pickle' % (
                         nm, no, ni)
-                    print('reading ' + fname)
                     if os.path.exists(fname):
+                        print('reading ' + fname)
                         output = pickle.load(open(fname, 'rb'))
                         assert(len(output[:, 1]) == num_samples)
                         score[nm, no, :] = output[:, 1]
                         time[nm, no, :] = output[:, 2]
                     else:
+                        print(model, optimiser, noise, 'does not exist ' + fname)
                         score[nm, no, :] = float('nan')
                         time[nm, no, :] = float('nan')
                 for no, mcmc in enumerate(hyper_mcmcs):
                     fname = 'output_%d_%d_%d.pickle' % (
                         nm, no + len(hyper_optimisers), ni)
-                    print('reading ' + fname)
+                    print('integer is ', nm*(len(noise_levels)*(len(hyper_optimisers)+len(hyper_mcmcs)))+(no+len(hyper_optimisers))*len(noise_levels)+ni)
                     if os.path.exists(fname):
+                        print('reading ' + fname)
                         output = pickle.load(open(fname, 'rb'))
                         assert(len(output[:, 1] == num_samples))
                         rhat[nm, no, :] = output[:, 0]
                         ess[nm, no, :] = output[:, 1]
                         time_mcmc[nm, no, :] = output[:, 2]
+                        if mcmc == HyperDifferentialEvolutionMCMC:
+                            print('diff evolution mcmc: ')
+                            print('rhat: ', output[:, 0])
+                            print('ess: ', output[:, 1])
+                            print('time_mcmc: ', output[:, 2])
                     else:
+                        print(model, mcmc, noise, 'does not exist ' + fname)
                         rhat[nm, no, :] = float('nan')
                         ess[nm, no, :] = float('nan')
                         time_mcmc[nm, no, :] = float('nan')
