@@ -6,7 +6,7 @@
 # set the partition where the job will run
 #SBATCH --partition=compute
 
-#SBATCH --cpus-per-task=1
+#SBATCH --cpus-per-task=16
 
 # set max wallclock time
 #SBATCH --time=10:00:00
@@ -30,9 +30,9 @@ module load python/3.5
 #pip install --user ./pints
 
 if [ -n "$SLURM_CPUS_PER_TASK" ]; then
-    omp_threads=$SLURM_CPUS_PER_TASK
+  omp_threads=$SLURM_CPUS_PER_TASK
 else
-    omp_threads=1
+  omp_threads=1
 fi
 export set OMP_NUM_THREADS=$omp_threads
 
