@@ -1,120 +1,225 @@
-import pints
-import pints.toy
 import numpy as np
-from timeit import default_timer as timer
 import multiprocessing
 from itertools import repeat
 from GPyOpt.methods import BayesianOptimization
 import os
-import math
+import pickle
+import numpy as np
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
 
 
-class HyperOptimiser:
-    def __init__(self, optimiser, model, noise, times, real_parameters, lower, upper):
-        self.optimiser = optimiser
-        self.model = model
-        self.noise = noise
-        self.times = times
-        self.real_parameters = real_parameters
-        self.lower = lower
-        self.upper = upper
+def run_single(noise_level, model, hyper_method, max_tuning_runs, num_samples):
+    parameter = model().suggested_parameters()
+    lower = parameter / 10.0
+    upper = parameter * 10.0
+    times = model().suggested_times()
+    if no >= len(hyper_optimisers):
+        output = mcmc_sampler(num_samples,
+                              max_tuning_runs,
+                              hyper_method(model,
+                                           noise_level,
+                                           times,
+                                           parameters, lower, upper))
+    else:
+        output = optimise_sampler(num_samples,
+                                  max_tuning_runs,
+                                  hyper_method(model,
+                                               noise_level,
+                                               times,
+                                               parameters, lower, upper))
 
-    def optimise(self, set_hyper_params, parallel=False):
-        the_model = self.model()
-        print('model = ', the_model)
-        values = the_model.simulate(self.real_parameters, self.times)
-        value_range = np.max(values) - np.min(values)
-        values += np.random.normal(0, self.noise * value_range, values.shape)
-        problem = pints.MultiOutputProblem(the_model, self.times, values)
-        score = pints.SumOfSquaresError(problem)
-        middle = [0.5 * (u + l) for l, u in zip(self.lower, self.upper)]
-        sigma = [(1.0/6.0)*(u - l) for l, u in zip(self.lower, self.upper)]
-        print('sigma = ', sigma)
-        boundaries = pints.Boundaries(self.lower, self.upper)
-
-        optimisation = pints.Optimisation(
-            score,
-            middle,
-            sigma0=sigma,
-            boundaries=boundaries,
-            method=self.optimiser
-        )
-        set_hyper_params(optimisation.optimiser())
-        if parallel:
-            optimisation.set_parallel(int(os.environ['OMP_NUM_THREADS']))
-
-        start = timer()
-        found_parameters, found_value = optimisation.run()
-        end = timer()
-        N = 10
-        start_score = timer()
-        for i in range(N):
-            minimum_value = score(self.real_parameters)
-        end_score = timer()
-        score_duration = (end_score - start_score) / N
-
-        # found_values = the_model.simulate(found_parameters, times)
-
-        # plt.figure()
-        # plt.xlabel('Time')
-        # plt.ylabel('Value')
-        # plt.plot(times, values, c='b', label='Noisy data')
-        # plt.plot(times, found_values, c='r', label='Fit')
-        # plt.title('score = %f' % (found_value))
-        # plt.savefig('fit_for_optimiser_%s_and_model_%s_with_noise_%f.pdf' %
-        #            (optimiser.__name__, model.__name__, noise))
-
-        return found_parameters,  \
-            found_value / minimum_value, \
-            (end - start) / score_duration
+    fname = 'output_%d_%d_%d.pickle' % (nm, no, ni)
+    print('writing ' + fname)
+    pickle.dump(output, open(fname, 'wb'))
 
 
-class HyperSampler:
-    def __init__(self, mcmc_method, model, noise, times, real_parameters, lower, upper):
-        self.mcmc_method = mcmc_method
-        self.model = model
-        self.noise = noise
-        self.times = times
-        self.real_parameters = real_parameters
-        self.lower = lower
-        self.upper = upper
+def run_matrix(noise_levels, models, hyper_optimisers, hyper_mcmcs, max_tuning_runs, num_samples):
+    parameters = [m().suggested_parameters() for m in models]
+    lower = [[p / 10.0 for p in all_p] for all_p in parameters]
+    upper = [[p * 10.0 for p in all_p] for all_p in parameters]
+    times = [m().suggested_times() for m in models]
+    for ni, noise in enumerate(noise_levels):
+        for nm, model in enumerate(models):
+            for no, optimiser in enumerate(hyper_optimisers):
+                print('running matrix (%d,%d,%d)' % (nm, no, ni))
+                try:
+                    output = optimise_sampler(num_samples, max_tuning_runs, optimiser[no](optimiser, model, noise, times[nm], parameters[nm], lower[nm], upper[nm]))
+                    fname = 'output_%d_%d_%d.pickle' % (nm, no, ni)
+                    print('writing ' + fname)
+                    pickle.dump(output, open(fname, 'wb'))
+                except Exception:
+                    pass
+            for no, mcmc in enumerate(hyper_mcmcs):
+                print('running matrix (%d,%d,%d)' % (nm, no, ni))
+                try:
+                    output = mcmc_sampler(num_samples, max_tuning_runs, optimiser(
+                                          model, noise, times[nm],
+                                          parameters[nm], lower[nm], upper[nm]))
+                    fname = 'output_%d_%d_%d.pickle' % (
+                        nm, no + len(hyper_optimisers), ni)
+                    print('writing ' + fname)
+                    pickle.dump(output, open(fname, 'wb'))
+                except Exception:
+                    pass
 
-    def sample(self, set_hyper_params):
-        the_model = self.model()
-        values = the_model.simulate(self.real_parameters, self.times)
-        value_range = np.max(values) - np.min(values)
-        values += np.random.normal(0, self.noise * value_range, values.shape)
-        problem = pints.MultiOutputProblem(the_model, self.times, values)
-        log_likelihood = pints.UnknownNoiseLogLikelihood(problem)
-        lower = list(self.lower) + [value_range * self.noise / 10.0]*the_model.n_outputs()
-        upper = list(self.upper) + [value_range * self.noise * 10]*the_model.n_outputs()
-        middle = [0.5 * (u + l) for l, u in zip(lower, upper)]
-        sigma = [u - l for l, u in zip(lower, upper)]
-        log_prior = pints.UniformLogPrior(lower, upper)
-        log_posterior = pints.LogPosterior(log_likelihood, log_prior)
-        n_chains = 3
-        xs = [[np.random.uniform() * (u - l) + l for l, u in zip(lower, upper)]
-              for c in range(n_chains)]
-        mcmc = pints.MCMCSampling(log_posterior, 3, xs, method=self.mcmc_method)
-        [set_hyper_params(sampler) for sampler in mcmc.samplers()]
-        # mcmc.set_max_iterations(10000)
-        # mcmc.set_verbose(False)
-        # logger_fn = 'logger_info.out'
-        # mcmc.set_log_to_file(logger_fn)
 
-        start = timer()
-        chains = mcmc.run()
-        end = timer()
+def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_samples):
+    f = plt.figure()
+    y = range(len(models))
+    y_labels = [m.__name__ for m in models]
+    x = range(len(hyper_optimisers))
+    x_labels = [o.__name__ for o in hyper_optimisers]
+    x_mcmc = range(len(hyper_mcmcs))
+    x_mcmc_labels = [m.__name__ for m in hyper_mcmcs]
+    for ni, noise in enumerate(noise_levels):
+        score = np.zeros((len(models), len(hyper_optimisers), num_samples))
+        time = np.zeros((len(models), len(hyper_optimisers), num_samples))
+        rhat = np.zeros((len(models), len(hyper_mcmcs), num_samples))
+        ess = np.zeros((len(models), len(hyper_mcmcs), num_samples))
+        time_mcmc = np.zeros((len(models), len(hyper_mcmcs), num_samples))
+        for nm, model in enumerate(models):
+            for no, optimiser in enumerate(hyper_optimisers):
+                fname = 'output_%d_%d_%d.pickle' % (
+                    nm, no, ni)
+                if os.path.exists(fname):
+                    print('reading ' + fname)
+                    output = pickle.load(open(fname, 'rb'))
+                    assert(len(output[:, 1]) == num_samples)
+                    score[nm, no, :] = output[:, 1]
+                    time[nm, no, :] = output[:, 2]
+                else:
+                    print(model, optimiser, noise, 'does not exist ' + fname)
+                    score[nm, no, :] = float('nan')
+                    time[nm, no, :] = float('nan')
+            for no, mcmc in enumerate(hyper_mcmcs):
+                fname = 'output_%d_%d_%d.pickle' % (
+                    nm, no + len(hyper_optimisers), ni)
+                print('integer is ', nm*(len(noise_levels)*(len(hyper_optimisers)+len(hyper_mcmcs)))+(no+len(hyper_optimisers))*len(noise_levels)+ni)
+                if os.path.exists(fname):
+                    print('reading ' + fname)
+                    output = pickle.load(open(fname, 'rb'))
+                    assert(len(output[:, 1] == num_samples))
+                    rhat[nm, no, :] = output[:, 0]
+                    ess[nm, no, :] = output[:, 1]
+                    time_mcmc[nm, no, :] = output[:, 2]
+                    if mcmc == HyperDifferentialEvolutionMCMC:
+                        print('diff evolution mcmc: ')
+                        print('rhat: ', output[:, 0])
+                        print('ess: ', output[:, 1])
+                        print('time_mcmc: ', output[:, 2])
+                else:
+                    print(model, mcmc, noise, 'does not exist ' + fname)
+                    rhat[nm, no, :] = float('nan')
+                    ess[nm, no, :] = float('nan')
+                    time_mcmc[nm, no, :] = float('nan')
 
-        rhat = np.max(pints._diagnostics.rhat_all_params(chains))
-        ess = 0
-        for chain in chains:
-            ess += pints._diagnostics.effective_sample_size(chain)
-        ess = np.min(ess)
-        print('rhat:', rhat)
-        print('ess:', ess)
-        print('time:', end - start)
-        return rhat, ess, end - start
+        normalise = False
+        if normalise:
+            for nm, model in enumerate(models):
+                min_score = np.min(score[nm, :, :], axis=(0, 1))
+                max_score = np.max(score[nm, :, :], axis=(0, 1))
+                score[nm, :, :] = (score[nm, :, :] -
+                                   min_score) / (max_score - min_score)
+                min_time = np.min(time[nm, :, :], axis=(0, 1))
+                max_time = np.max(time[nm, :, :], axis=(0, 1))
+                time[nm, :, :] = (time[nm, :, :] -
+                                  min_time) / (max_time - min_time)
+                min_rhat = np.min(rhat[nm, :, :], axis=(0, 1))
+                max_rhat = np.max(rhat[nm, :, :], axis=(0, 1))
+                rhat[nm, :, :] = (rhat[nm, :, :] -
+                                  min_rhat) / (max_rhat - min_rhat)
+                min_ess = np.min(ess[nm, :, :], axis=(0, 1))
+                max_ess = np.max(ess[nm, :, :], axis=(0, 1))
+                ess[nm, :, :] = (ess[nm, :, :] -
+                                 min_ess) / (max_ess - min_ess)
+                min_time_mcmc = np.min(time_mcmc[nm, :, :], axis=(0, 1))
+                max_time_mcmc = np.max(time_mcmc[nm, :, :], axis=(0, 1))
+                time_mcmc[nm, :, :] = (time_mcmc[nm, :, :] -
+                                       min_time_mcmc) / (max_time_mcmc - min_time_mcmc)
+
+        plt.clf()
+        imshow = plt.imshow(np.mean(score, axis=2), cmap='RdYlBu_r',
+                            interpolation='nearest')
+        plt.xticks(x, x_labels, rotation=45)
+        plt.yticks(y, y_labels)
+        plt.colorbar(label='score (mean)')
+        plt.tight_layout()
+        plt.savefig('score_mean_with_noise_%d.pdf' % ni)
+        plt.clf()
+        imshow = plt.imshow(np.min(score, axis=2), cmap='RdYlBu_r',
+                            interpolation='nearest')
+        plt.xticks(x, x_labels, rotation=45)
+        plt.yticks(y, y_labels)
+        plt.colorbar(label='score (min)')
+        plt.tight_layout()
+        plt.savefig('score_min_with_noise_%d.pdf' % ni)
+        plt.clf()
+        plt.imshow(np.mean(time, axis=2),
+                   cmap='RdYlBu_r', interpolation='nearest')
+        plt.xticks(x, x_labels, rotation=45)
+        plt.yticks(y, y_labels)
+        plt.colorbar(label='time (mean)')
+        plt.tight_layout()
+        plt.savefig('time_mean_with_noise_%d.pdf' % ni)
+        plt.clf()
+        plt.imshow(np.min(time, axis=2),
+                   cmap='RdYlBu_r', interpolation='nearest')
+        plt.xticks(x, x_labels, rotation=45)
+        plt.yticks(y, y_labels)
+        plt.colorbar(label='time (min)')
+        plt.tight_layout()
+        plt.savefig('time_min_with_noise_%d.pdf' % ni)
+
+        plt.clf()
+        imshow = plt.imshow(np.mean(rhat, axis=2), cmap='RdYlBu_r',
+                            interpolation='nearest')
+        plt.xticks(x_mcmc, x_mcmc_labels, rotation=45)
+        plt.yticks(y, y_labels)
+        plt.colorbar(label='rhat (mean)')
+        plt.tight_layout()
+        plt.savefig('rhat_mean_with_noise_%d.pdf' % ni)
+        plt.clf()
+        imshow = plt.imshow(np.min(rhat, axis=2), cmap='RdYlBu_r',
+                            interpolation='nearest')
+        plt.xticks(x_mcmc, x_mcmc_labels, rotation=45)
+        plt.yticks(y, y_labels)
+        plt.colorbar(label='rhat (min)')
+        plt.tight_layout()
+        plt.savefig('rhat_min_with_noise_%d.pdf' % ni)
+        plt.clf()
+        plt.imshow(np.mean(ess, axis=2),
+                   cmap='RdYlBu_r', interpolation='nearest')
+        plt.xticks(x_mcmc, x_mcmc_labels, rotation=45)
+        plt.yticks(y, y_labels)
+        plt.colorbar(label='ess (mean)')
+        plt.tight_layout()
+        plt.savefig('ess_mean_with_noise_%d.pdf' % ni)
+        plt.clf()
+        plt.imshow(np.min(ess, axis=2),
+                   cmap='RdYlBu_r', interpolation='nearest')
+        plt.xticks(x_mcmc, x_mcmc_labels, rotation=45)
+        plt.yticks(y, y_labels)
+        plt.colorbar(label='ess (min)')
+        plt.tight_layout()
+        plt.savefig('ess_min_with_noise_%d.pdf' % ni)
+        plt.clf()
+        plt.imshow(np.mean(time_mcmc, axis=2),
+                   cmap='RdYlBu_r', interpolation='nearest')
+        plt.xticks(x_mcmc, x_mcmc_labels, rotation=45)
+        plt.yticks(y, y_labels)
+        plt.colorbar(label='time_mcmc (mean)')
+        plt.tight_layout()
+        plt.savefig('time_mcmc_mean_with_noise_%d.pdf' % ni)
+        plt.clf()
+        plt.imshow(np.min(time_mcmc, axis=2),
+                   cmap='RdYlBu_r', interpolation='nearest')
+        plt.xticks(x_mcmc, x_mcmc_labels, rotation=45)
+        plt.yticks(y, y_labels)
+        plt.colorbar(label='time_mcmc (min)')
+        plt.tight_layout()
+        plt.savefig('time_mcmc_min_with_noise_%d.pdf' % ni)
 
 
 def optimise(sample_num, hyper, x):
