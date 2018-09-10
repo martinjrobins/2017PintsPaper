@@ -1,10 +1,12 @@
 import pints
 from timeit import default_timer as timer
+import os
+import numpy as np
 
 
 class HyperSampler:
     def __init__(self, mcmc_method, model, noise, times, real_parameters, lower, upper):
-        self.mcmc_method = mcmc_method
+        self.method = mcmc_method
         self.model = model
         self.noise = noise
         self.times = times
@@ -28,8 +30,8 @@ class HyperSampler:
         n_chains = 3
         xs = [[np.random.uniform() * (u - l) + l for l, u in zip(lower, upper)]
               for c in range(n_chains)]
-        mcmc = pints.MCMCSampling(log_posterior, 3, xs, method=self.mcmc_method)
-        [sampler.set_hyper_params(x) for sampler in mcmc.samplers()]
+        mcmc = pints.MCMCSampling(log_posterior, 3, xs, method=self.method)
+        [sampler.set_hyper_parameters(x) for sampler in mcmc.samplers()]
         if parallel:
             mcmc.set_parallel(int(os.environ['OMP_NUM_THREADS']))
 
@@ -53,13 +55,15 @@ class HyperSampler:
         return rhat, ess, end - start
 
     def __call__(self, x):
-        ess = self.sample(x, parallel=True)[1]
+        ess = self.sample(x[0], parallel=True)[1]
         if math.isnan(ess):
             return math.inf
         return 1.0/ess
 
 
 class HyperMCMC(HyperSampler):
+    method_name = 'MetropolisRandomWalkMCMC'
+
     def __init__(self, model, noise, times, real_parameters, lower, upper):
         super(HyperMCMC, self).__init__(pints.MetropolisRandomWalkMCMC, model, noise, times, real_parameters, lower, upper)
 
@@ -71,6 +75,8 @@ class HyperMCMC(HyperSampler):
 
 
 class HyperAdaptiveMCMC(HyperSampler):
+    method_name = 'AdaptiveCovarianceMCMC'
+
     def __init__(self, model, noise, times, real_parameters, lower, upper):
         super(HyperAdaptiveMCMC, self).__init__(pints.AdaptiveCovarianceMCMC, model, noise, times, real_parameters, lower, upper)
 
@@ -82,6 +88,8 @@ class HyperAdaptiveMCMC(HyperSampler):
 
 
 class HyperDifferentialEvolutionMCMC(HyperSampler):
+    method_name = 'DifferentialEvolutionMCMC'
+
     def __init__(self, model, noise, times, real_parameters, lower, upper):
         super(HyperDifferentialEvolutionMCMC, self).__init__(pints.DifferentialEvolutionMCMC, model, noise, times, real_parameters, lower, upper)
 
@@ -94,6 +102,8 @@ class HyperDifferentialEvolutionMCMC(HyperSampler):
 
 
 class HyperPopulationMCMC(HyperSampler):
+    method_name = 'PopulationMCMC'
+
     def __init__(self, model, noise, times, real_parameters, lower, upper):
         super(HyperPopulationMCMC, self).__init__(pints.PopulationMCMC, model, noise, times, real_parameters, lower, upper)
 

@@ -2,6 +2,8 @@ import numpy as np
 import multiprocessing
 from itertools import repeat
 from GPyOpt.methods import BayesianOptimization
+from HyperSampler import HyperSampler
+from HyperOptimiser import HyperOptimiser
 import os
 import pickle
 import numpy as np
@@ -10,59 +12,38 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 
 
+def to_filename(noise_level, model, hyper_method):
+    noise_str = str(noise_level).replace('.', '_')
+    model_str = model.__name__
+    hyper_method_str = hyper_method.method_name
+    return 'results-%s-%s-%s.pickle' % (model_str, hyper_method_str, noise_str)
+
+
 def run_single(noise_level, model, hyper_method, max_tuning_runs, num_samples):
-    parameter = model().suggested_parameters()
-    lower = parameter / 10.0
-    upper = parameter * 10.0
+    parameters = model().suggested_parameters()
+    lower = np.asarray(parameters) / 10.0
+    upper = np.asarray(parameters) * 10.0
     times = model().suggested_times()
-    if no >= len(hyper_optimisers):
+    if issubclass(hyper_method, HyperSampler):
         output = mcmc_sampler(num_samples,
                               max_tuning_runs,
                               hyper_method(model,
                                            noise_level,
                                            times,
                                            parameters, lower, upper))
-    else:
+    elif issubclass(hyper_method, HyperOptimiser):
         output = optimise_sampler(num_samples,
                                   max_tuning_runs,
                                   hyper_method(model,
                                                noise_level,
                                                times,
                                                parameters, lower, upper))
+    else:
+        raise TypeError("hyper_method must be an instance of HyperSampler or HyperOptimiser")
 
-    fname = 'output_%d_%d_%d.pickle' % (nm, no, ni)
+    fname = to_filename(noise_level, model, hyper_method)
     print('writing ' + fname)
     pickle.dump(output, open(fname, 'wb'))
-
-
-def run_matrix(noise_levels, models, hyper_optimisers, hyper_mcmcs, max_tuning_runs, num_samples):
-    parameters = [m().suggested_parameters() for m in models]
-    lower = [[p / 10.0 for p in all_p] for all_p in parameters]
-    upper = [[p * 10.0 for p in all_p] for all_p in parameters]
-    times = [m().suggested_times() for m in models]
-    for ni, noise in enumerate(noise_levels):
-        for nm, model in enumerate(models):
-            for no, optimiser in enumerate(hyper_optimisers):
-                print('running matrix (%d,%d,%d)' % (nm, no, ni))
-                try:
-                    output = optimise_sampler(num_samples, max_tuning_runs, optimiser[no](optimiser, model, noise, times[nm], parameters[nm], lower[nm], upper[nm]))
-                    fname = 'output_%d_%d_%d.pickle' % (nm, no, ni)
-                    print('writing ' + fname)
-                    pickle.dump(output, open(fname, 'wb'))
-                except Exception:
-                    pass
-            for no, mcmc in enumerate(hyper_mcmcs):
-                print('running matrix (%d,%d,%d)' % (nm, no, ni))
-                try:
-                    output = mcmc_sampler(num_samples, max_tuning_runs, optimiser(
-                                          model, noise, times[nm],
-                                          parameters[nm], lower[nm], upper[nm]))
-                    fname = 'output_%d_%d_%d.pickle' % (
-                        nm, no + len(hyper_optimisers), ni)
-                    print('writing ' + fname)
-                    pickle.dump(output, open(fname, 'wb'))
-                except Exception:
-                    pass
 
 
 def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_samples):
@@ -70,9 +51,9 @@ def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_sam
     y = range(len(models))
     y_labels = [m.__name__ for m in models]
     x = range(len(hyper_optimisers))
-    x_labels = [o.__name__ for o in hyper_optimisers]
+    x_labels = [o.__name__ for o in hyper_optimisers.method]
     x_mcmc = range(len(hyper_mcmcs))
-    x_mcmc_labels = [m.__name__ for m in hyper_mcmcs]
+    x_mcmc_labels = [m.__name__ for m in hyper_mcmcs.method]
     for ni, noise in enumerate(noise_levels):
         score = np.zeros((len(models), len(hyper_optimisers), num_samples))
         time = np.zeros((len(models), len(hyper_optimisers), num_samples))
@@ -81,8 +62,7 @@ def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_sam
         time_mcmc = np.zeros((len(models), len(hyper_mcmcs), num_samples))
         for nm, model in enumerate(models):
             for no, optimiser in enumerate(hyper_optimisers):
-                fname = 'output_%d_%d_%d.pickle' % (
-                    nm, no, ni)
+                fname = to_filename(noise, model, optimiser)
                 if os.path.exists(fname):
                     print('reading ' + fname)
                     output = pickle.load(open(fname, 'rb'))
@@ -94,9 +74,7 @@ def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_sam
                     score[nm, no, :] = float('nan')
                     time[nm, no, :] = float('nan')
             for no, mcmc in enumerate(hyper_mcmcs):
-                fname = 'output_%d_%d_%d.pickle' % (
-                    nm, no + len(hyper_optimisers), ni)
-                print('integer is ', nm*(len(noise_levels)*(len(hyper_optimisers)+len(hyper_mcmcs)))+(no+len(hyper_optimisers))*len(noise_levels)+ni)
+                fname = to_filename(noise, model, mcmc)
                 if os.path.exists(fname):
                     print('reading ' + fname)
                     output = pickle.load(open(fname, 'rb'))
@@ -104,11 +82,6 @@ def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_sam
                     rhat[nm, no, :] = output[:, 0]
                     ess[nm, no, :] = output[:, 1]
                     time_mcmc[nm, no, :] = output[:, 2]
-                    if mcmc == HyperDifferentialEvolutionMCMC:
-                        print('diff evolution mcmc: ')
-                        print('rhat: ', output[:, 0])
-                        print('ess: ', output[:, 1])
-                        print('time_mcmc: ', output[:, 2])
                 else:
                     print(model, mcmc, noise, 'does not exist ' + fname)
                     rhat[nm, no, :] = float('nan')
@@ -224,7 +197,7 @@ def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_sam
 
 def optimise(sample_num, hyper, x):
     print('optimise for sample', sample_num)
-    return hyper.run(x)
+    return hyper.optimise(x)
 
 
 def optimise_sampler(num_samples, max_tuning_runs, hyper):
@@ -248,7 +221,7 @@ def optimise_sampler(num_samples, max_tuning_runs, hyper):
 
 def sample(sample_num, hyper, x):
     print('sampling for sample', sample_num)
-    return hyper.run(x)
+    return hyper.sample(x)
 
 
 def mcmc_sampler(num_samples, max_tuning_runs, hyper):
