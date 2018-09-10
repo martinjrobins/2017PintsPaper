@@ -70,11 +70,15 @@ if __name__ == "__main__":
         if no < 0 or no >= len(hyper_optimisers) + len(hyper_mcmcs):
             raise ValueError('method index must be less than ' + str(len(hyper_optimisers) + len(hyper_mcmcs)))
         if no < len(hyper_optimisers):
-            print('running matrix (%s,%s,%s)' % (models[nm].__name__, hyper_optimisers[no].method_name, noise_levels[ni]))
+            print('running matrix (%s,%s,%s)' % (models[nm].__name__,
+                                                 hyper_optimisers[no].method_name,
+                                                 noise_levels[ni]))
             run_single(noise_levels[ni], models[nm], hyper_optimisers[no], max_tuning_runs, num_samples)
         else:
             no -= len(hyper_optimisers)
-            print('running matrix (%s,%s,%s)' % (models[nm].__name__, hyper_mcmcs[no].method_name, noise_levels[ni]))
+            print('running matrix (%s,%s,%s)' % (models[nm].__name__,
+                                                 hyper_mcmcs[no].method_name,
+                                                 noise_levels[ni]))
             run_single(noise_levels[ni], models[nm], hyper_mcmcs[no], max_tuning_runs, num_samples)
     elif args.run_all:
         for noise in noise_levels:
