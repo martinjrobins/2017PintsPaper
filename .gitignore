@@ -1,5 +1,5 @@
-*.pdf
-*.pickle
-env
-.vscode
-__pycache__
+results/*
+          plots/*
+          env
+          .vscode
+          __pycache__

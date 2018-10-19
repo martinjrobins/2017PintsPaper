@@ -2,21 +2,21 @@ import numpy as np
 import multiprocessing
 from itertools import repeat
 from GPyOpt.methods import BayesianOptimization
-from HyperSampler import HyperSampler
-from HyperOptimiser import HyperOptimiser
-import os
 import pickle
 import numpy as np
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
+import os
+
+import pmatrix
 
 
 def to_filename(noise_level, model, hyper_method):
     noise_str = str(noise_level).replace('.', '_')
     model_str = model.__name__
     hyper_method_str = hyper_method.method_name
-    return 'results-%s-%s-%s.pickle' % (model_str, hyper_method_str, noise_str)
+    return pmatrix.DIR_RESULT + '/' + 'results-%s-%s-%s.pickle' % (model_str, hyper_method_str, noise_str)
 
 
 def run_single(noise_level, model, hyper_method, max_tuning_runs, num_samples):
@@ -24,14 +24,14 @@ def run_single(noise_level, model, hyper_method, max_tuning_runs, num_samples):
     lower = np.asarray(parameters) / 10.0
     upper = np.asarray(parameters) * 10.0
     times = model().suggested_times()
-    if issubclass(hyper_method, HyperSampler):
+    if issubclass(hyper_method, pmatrix.HyperSampler):
         output = mcmc_sampler(num_samples,
                               max_tuning_runs,
                               hyper_method(model,
                                            noise_level,
                                            times,
                                            parameters, lower, upper))
-    elif issubclass(hyper_method, HyperOptimiser):
+    elif issubclass(hyper_method, pmatrix.HyperOptimiser):
         output = optimise_sampler(num_samples,
                                   max_tuning_runs,
                                   hyper_method(model,
@@ -46,14 +46,14 @@ def run_single(noise_level, model, hyper_method, max_tuning_runs, num_samples):
     pickle.dump(output, open(fname, 'wb'))
 
 
-def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_samples):
+def plot_matrix(noise_levels, models, hyper_optimisers, hyper_mcmcs, max_tuning_runs, num_samples):
     f = plt.figure()
     y = range(len(models))
     y_labels = [m.__name__ for m in models]
     x = range(len(hyper_optimisers))
-    x_labels = [o.__name__ for o in hyper_optimisers.method]
+    x_labels = [o.method_name for o in hyper_optimisers]
     x_mcmc = range(len(hyper_mcmcs))
-    x_mcmc_labels = [m.__name__ for m in hyper_mcmcs.method]
+    x_mcmc_labels = [m.method_name for m in hyper_mcmcs]
     for ni, noise in enumerate(noise_levels):
         score = np.zeros((len(models), len(hyper_optimisers), num_samples))
         time = np.zeros((len(models), len(hyper_optimisers), num_samples))
@@ -64,13 +64,13 @@ def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_sam
             for no, optimiser in enumerate(hyper_optimisers):
                 fname = to_filename(noise, model, optimiser)
                 if os.path.exists(fname):
-                    print('reading ' + fname)
+                    print('reading results for (', model.__name__, ',', optimiser.method_name, ',', noise, ')')
                     output = pickle.load(open(fname, 'rb'))
                     assert(len(output[:, 1]) == num_samples)
                     score[nm, no, :] = output[:, 1]
                     time[nm, no, :] = output[:, 2]
                 else:
-                    print(model, optimiser, noise, 'does not exist ' + fname)
+                    print('WARNING: no results for (', model.__name__, ',', optimiser.method_name, ',', noise, ')')
                     score[nm, no, :] = float('nan')
                     time[nm, no, :] = float('nan')
             for no, mcmc in enumerate(hyper_mcmcs):
@@ -83,7 +83,7 @@ def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_sam
                     ess[nm, no, :] = output[:, 1]
                     time_mcmc[nm, no, :] = output[:, 2]
                 else:
-                    print(model, mcmc, noise, 'does not exist ' + fname)
+                    print('WARNING: no results for (', model.__name__, ',', mcmc.method_name, ',', noise, ')')
                     rhat[nm, no, :] = float('nan')
                     ess[nm, no, :] = float('nan')
                     time_mcmc[nm, no, :] = float('nan')
@@ -119,7 +119,7 @@ def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_sam
         plt.yticks(y, y_labels)
         plt.colorbar(label='score (mean)')
         plt.tight_layout()
-        plt.savefig('score_mean_with_noise_%d.pdf' % ni)
+        plt.savefig(pmatrix.DIR_PLOT+'/'+'score_mean_with_noise_%d.pdf' % ni)
         plt.clf()
         imshow = plt.imshow(np.min(score, axis=2), cmap='RdYlBu_r',
                             interpolation='nearest')
@@ -127,7 +127,7 @@ def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_sam
         plt.yticks(y, y_labels)
         plt.colorbar(label='score (min)')
         plt.tight_layout()
-        plt.savefig('score_min_with_noise_%d.pdf' % ni)
+        plt.savefig(pmatrix.DIR_PLOT+'/'+'score_min_with_noise_%d.pdf' % ni)
         plt.clf()
         plt.imshow(np.mean(time, axis=2),
                    cmap='RdYlBu_r', interpolation='nearest')
@@ -135,7 +135,7 @@ def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_sam
         plt.yticks(y, y_labels)
         plt.colorbar(label='time (mean)')
         plt.tight_layout()
-        plt.savefig('time_mean_with_noise_%d.pdf' % ni)
+        plt.savefig(pmatrix.DIR_PLOT+'/'+'time_mean_with_noise_%d.pdf' % ni)
         plt.clf()
         plt.imshow(np.min(time, axis=2),
                    cmap='RdYlBu_r', interpolation='nearest')
@@ -143,7 +143,7 @@ def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_sam
         plt.yticks(y, y_labels)
         plt.colorbar(label='time (min)')
         plt.tight_layout()
-        plt.savefig('time_min_with_noise_%d.pdf' % ni)
+        plt.savefig(pmatrix.DIR_PLOT+'/'+'time_min_with_noise_%d.pdf' % ni)
 
         plt.clf()
         imshow = plt.imshow(np.mean(rhat, axis=2), cmap='RdYlBu_r',
@@ -152,7 +152,7 @@ def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_sam
         plt.yticks(y, y_labels)
         plt.colorbar(label='rhat (mean)')
         plt.tight_layout()
-        plt.savefig('rhat_mean_with_noise_%d.pdf' % ni)
+        plt.savefig(pmatrix.DIR_PLOT+'/'+'rhat_mean_with_noise_%d.pdf' % ni)
         plt.clf()
         imshow = plt.imshow(np.min(rhat, axis=2), cmap='RdYlBu_r',
                             interpolation='nearest')
@@ -160,7 +160,7 @@ def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_sam
         plt.yticks(y, y_labels)
         plt.colorbar(label='rhat (min)')
         plt.tight_layout()
-        plt.savefig('rhat_min_with_noise_%d.pdf' % ni)
+        plt.savefig(pmatrix.DIR_PLOT+'/'+'rhat_min_with_noise_%d.pdf' % ni)
         plt.clf()
         plt.imshow(np.mean(ess, axis=2),
                    cmap='RdYlBu_r', interpolation='nearest')
@@ -168,7 +168,7 @@ def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_sam
         plt.yticks(y, y_labels)
         plt.colorbar(label='ess (mean)')
         plt.tight_layout()
-        plt.savefig('ess_mean_with_noise_%d.pdf' % ni)
+        plt.savefig(pmatrix.DIR_PLOT+'/'+'ess_mean_with_noise_%d.pdf' % ni)
         plt.clf()
         plt.imshow(np.min(ess, axis=2),
                    cmap='RdYlBu_r', interpolation='nearest')
@@ -176,7 +176,7 @@ def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_sam
         plt.yticks(y, y_labels)
         plt.colorbar(label='ess (min)')
         plt.tight_layout()
-        plt.savefig('ess_min_with_noise_%d.pdf' % ni)
+        plt.savefig(pmatrix.DIR_PLOT+'/'+'ess_min_with_noise_%d.pdf' % ni)
         plt.clf()
         plt.imshow(np.mean(time_mcmc, axis=2),
                    cmap='RdYlBu_r', interpolation='nearest')
@@ -184,7 +184,7 @@ def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_sam
         plt.yticks(y, y_labels)
         plt.colorbar(label='time_mcmc (mean)')
         plt.tight_layout()
-        plt.savefig('time_mcmc_mean_with_noise_%d.pdf' % ni)
+        plt.savefig(pmatrix.DIR_PLOT+'/'+'time_mcmc_mean_with_noise_%d.pdf' % ni)
         plt.clf()
         plt.imshow(np.min(time_mcmc, axis=2),
                    cmap='RdYlBu_r', interpolation='nearest')
@@ -192,7 +192,7 @@ def plot_matrix(noise_levels, models, hyper_optimisers, max_tuning_runs, num_sam
         plt.yticks(y, y_labels)
         plt.colorbar(label='time_mcmc (min)')
         plt.tight_layout()
-        plt.savefig('time_mcmc_min_with_noise_%d.pdf' % ni)
+        plt.savefig(pmatrix.DIR_PLOT+'/'+'time_mcmc_min_with_noise_%d.pdf' % ni)
 
 
 def optimise(sample_num, hyper, x):

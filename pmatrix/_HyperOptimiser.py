@@ -5,6 +5,25 @@ import os
 
 
 class HyperOptimiser:
+    """
+    A hyper base class that is used to run a single optimisation method
+
+    Args:
+
+    ``optimiser``
+        The type of the optimiser method to use
+    ``model``
+        The type of the model to use
+    ``noise``
+        The level of noise added to the simulated data
+    ``times``
+        The time points to use for the simulated data
+    ``real_parameters``
+        The real parameters to use for the simulated data
+    ``lower`` ``upper``
+        The optimiser is given these bounds to search between
+     """
+
     def __init__(self, optimiser, model, noise, times, real_parameters, lower, upper):
         self.method = optimiser
         self.model = model
@@ -15,6 +34,18 @@ class HyperOptimiser:
         self.upper = upper
 
     def optimise(self, x, parallel=False):
+        """
+        Runs the optimisation, this method:
+            (1) generates simulated data and adds noise
+            (2) sets up the optimiser with the method given, trying to
+                optimise the function f(x) = sum of squared error
+            (3) runs the optimisation
+            (4) returns:
+                - the found parameters x,
+                - the ratio of f(x) / f(x_0), where x_0 are the real parameters
+                - time total time taken divided by the time taken to evaluate a
+                  single evaluation of f(x)
+        """
         the_model = self.model()
         print('model = ', the_model)
         values = the_model.simulate(self.real_parameters, self.times)
@@ -37,6 +68,8 @@ class HyperOptimiser:
         optimisation.optimiser().set_hyper_parameters(x)
         if parallel:
             optimisation.set_parallel(int(os.environ['OMP_NUM_THREADS']))
+        else:
+            optimisation.set_parallel(False)
 
         start = timer()
         found_parameters, found_value = optimisation.run()
@@ -53,10 +86,18 @@ class HyperOptimiser:
             (end - start) / score_duration
 
     def __call__(self, x):
+        """
+        call method used by the GPyOpt to optimise the hyper-parameters.
+
+        optimises on the ratio of f(x)/f(x_0)
+        """
         return self.optimise(x[0], parallel=True)[1]
 
 
 class HyperCMAES(HyperOptimiser):
+    """
+    *Extends:* :class:`HyperOptimiser`
+    """
     method_name = 'CMAES'
 
     def __init__(self, model, noise, times, real_parameters, lower, upper):
@@ -71,6 +112,9 @@ class HyperCMAES(HyperOptimiser):
 
 
 class HyperPSO(HyperOptimiser):
+    """
+    *Extends:* :class:`HyperOptimiser`
+    """
     method_name = 'PSO'
 
     def __init__(self, model, noise, times, real_parameters, lower, upper):
@@ -86,6 +130,9 @@ class HyperPSO(HyperOptimiser):
 
 
 class HyperXNES(HyperOptimiser):
+    """
+    *Extends:* :class:`HyperOptimiser`
+    """
     method_name = 'XNES'
 
     def __init__(self, model, noise, times, real_parameters, lower, upper):
@@ -100,6 +147,9 @@ class HyperXNES(HyperOptimiser):
 
 
 class HyperSNES(HyperOptimiser):
+    """
+    *Extends:* :class:`HyperOptimiser`
+    """
     method_name = 'SNES'
 
     def __init__(self, model, noise, times, real_parameters, lower, upper):

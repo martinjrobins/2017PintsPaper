@@ -1,0 +1,8 @@
+#!/usr/bin/env python3
+#
+# Run the performance matrix
+#
+
+# Run
+from pmatrix.__main__ import main
+main()

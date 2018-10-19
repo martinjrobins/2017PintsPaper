@@ -5,6 +5,25 @@ import numpy as np
 
 
 class HyperSampler:
+    """
+    A hyper base class that is used to run a single mcmc sampler method
+
+    Args:
+
+    ``mcmc_method``
+        The type of the optimiser method to use
+    ``model``
+        The type of the model to use
+    ``noise``
+        The level of noise added to the simulated data
+    ``times``
+        The time points to use for the simulated data
+    ``real_parameters``
+        The real parameters to use for the simulated data
+    ``lower`` ``upper``
+        The sampler is given these bounds to search between
+     """
+
     def __init__(self, mcmc_method, model, noise, times, real_parameters, lower, upper):
         self.method = mcmc_method
         self.model = model
@@ -15,6 +34,18 @@ class HyperSampler:
         self.upper = upper
 
     def sample(self, x, parallel=False):
+        """
+        Runs the sampler, this method:
+            (1) generates simulated data and adds noise
+            (2) sets up the sampler with the method given,
+                using an UnknownNoiseLogLikelihood, and a UniformLogPrior
+            (3) runs the sampler
+            (4) returns:
+                - the calculated rhat value
+                - the sum of ess across all chains
+                - the total time taken by the sampler
+        """
+
         the_model = self.model()
         values = the_model.simulate(self.real_parameters, self.times)
         value_range = np.max(values) - np.min(values)
@@ -55,6 +86,12 @@ class HyperSampler:
         return rhat, ess, end - start
 
     def __call__(self, x):
+        """
+        call method used by the GPyOpt to optimise the hyper-parameters
+
+        optimises on 1/ess. i.e. GPyOpt tries to maximise the ess
+
+        """
         ess = self.sample(x[0], parallel=True)[1]
         if math.isnan(ess):
             return math.inf
