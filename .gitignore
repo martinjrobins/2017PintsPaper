@@ -1,5 +1,5 @@
-results/*
-          plots/*
-          env
-          .vscode
-          __pycache__
+env
+.vscode
+__pycache__
+plots
+results
