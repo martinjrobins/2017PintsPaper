@@ -1,6 +1,6 @@
 # Pints Matrix
 
-This repo contains the infrastructure neccessary to run the full Pints testing matrix on the Oxford `arcus-b` cluster.
+Use the `matrix` tool to run the Pints performance matrix
 
 # Getting Started
 
