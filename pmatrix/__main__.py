@@ -80,10 +80,10 @@ def main():
             for model in pmatrix.models:
                 for method in pmatrix.hyper_optimisers:
                     pmatrix.run_single(noise, model, method,
-                                       pmatrix.max_tuning_runs, num_samples)
+                                       pmatrix.max_tuning_runs, pmatrix.num_samples)
                 for method in pmatrix.hyper_mcmcs:
                     pmatrix.run_single(noise, model, method,
-                                       pmatrix.max_tuning_runs, num_samples)
+                                       pmatrix.max_tuning_runs, pmatrix.num_samples)
 
     if args.plot:
         pmatrix.plot_matrix(pmatrix.noise_levels, pmatrix.models,
