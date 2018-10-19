@@ -20,19 +20,11 @@ $ cd performance-testing
 $ pip install -r requirements.txt
 ```
 
-# What are the tests
+# Running the tests and plotting results
 
-Look in the `main.py` file and look at the variables `models`, `optimisers`, and `noise_levels`
-
-# Running the tests
-
-Run this command in the root directory of this repository
+Please see the help for the `matrix` tool
 
 ```bash
-$ python main.py --execute
+$ ./matrix -h
 ```
-
-This will `ssh` into the arcus-b cluster and submit an array job that executes the full matrix of tests.
-
-
 
