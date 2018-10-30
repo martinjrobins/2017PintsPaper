@@ -2,6 +2,7 @@ import pints
 from timeit import default_timer as timer
 import os
 import numpy as np
+import math
 
 
 class HyperSampler:
@@ -42,7 +43,8 @@ class HyperSampler:
             (3) runs the sampler
             (4) returns:
                 - the calculated rhat value
-                - the sum of ess across all chains
+                - the average of ess across all chains, returning the
+                  minimum result across all parameters
                 - the total time taken by the sampler
         """
 
@@ -58,27 +60,25 @@ class HyperSampler:
         sigma = [u - l for l, u in zip(lower, upper)]
         log_prior = pints.UniformLogPrior(lower, upper)
         log_posterior = pints.LogPosterior(log_likelihood, log_prior)
-        n_chains = 3
+        n_chains = int(x[-1])
         xs = [[np.random.uniform() * (u - l) + l for l, u in zip(lower, upper)]
               for c in range(n_chains)]
-        mcmc = pints.MCMCSampling(log_posterior, 3, xs, method=self.method)
-        [sampler.set_hyper_parameters(x) for sampler in mcmc.samplers()]
+        mcmc = pints.MCMCSampling(log_posterior, n_chains, xs, method=self.method)
+        [sampler.set_hyper_parameters(x[:-1]) for sampler in mcmc.samplers()]
         if parallel:
             mcmc.set_parallel(int(os.environ['OMP_NUM_THREADS']))
 
-        # mcmc.set_max_iterations(10000)
-        # mcmc.set_verbose(False)
-        # logger_fn = 'logger_info.out'
-        # mcmc.set_log_to_file(logger_fn)
+        mcmc.set_log_interval(1000)
 
         start = timer()
         chains = mcmc.run()
         end = timer()
 
         rhat = np.max(pints._diagnostics.rhat_all_params(chains))
-        ess = 0
+        ess = np.zeros(chains[0].shape[1])
         for chain in chains:
-            ess += pints._diagnostics.effective_sample_size(chain)
+            ess += np.array(pints._diagnostics.effective_sample_size(chain))
+        ess /= n_chains
         ess = np.min(ess)
         print('rhat:', rhat)
         print('ess:', ess)
@@ -105,10 +105,10 @@ class HyperMCMC(HyperSampler):
         super(HyperMCMC, self).__init__(pints.MetropolisRandomWalkMCMC, model, noise, times, real_parameters, lower, upper)
 
     def n_parameters(self):
-        return 0
+        return 1
 
     def bounds(self):
-        return None
+        return [{'name': 'nchains', 'type': 'discrete', 'domain': range(2, 20), 'dimensionality': 1}]
 
 
 class HyperAdaptiveMCMC(HyperSampler):
@@ -118,10 +118,10 @@ class HyperAdaptiveMCMC(HyperSampler):
         super(HyperAdaptiveMCMC, self).__init__(pints.AdaptiveCovarianceMCMC, model, noise, times, real_parameters, lower, upper)
 
     def n_parameters(self):
-        return 0
+        return 1
 
     def bounds(self):
-        return None
+        return [{'name': 'nchains', 'type': 'discrete', 'domain': range(2, 20), 'dimensionality': 1}]
 
 
 class HyperDifferentialEvolutionMCMC(HyperSampler):
@@ -131,11 +131,13 @@ class HyperDifferentialEvolutionMCMC(HyperSampler):
         super(HyperDifferentialEvolutionMCMC, self).__init__(pints.DifferentialEvolutionMCMC, model, noise, times, real_parameters, lower, upper)
 
     def n_parameters(self):
-        return 2
+        return 3
 
     def bounds(self):
         return [{'name': 'gamma', 'type': 'continuous', 'domain': (0, 20.38/np.sqrt(2*self.model().n_parameters()))},
-                {'name': 'normal_scale', 'type': 'continuous', 'domain': (0, 1)}]
+                {'name': 'normal_scale', 'type': 'continuous', 'domain': (0, 1)},
+                {'name': 'nchains', 'type': 'discrete', 'domain': range(2, 20), 'dimensionality': 1}
+                ]
 
 
 class HyperPopulationMCMC(HyperSampler):
@@ -145,7 +147,9 @@ class HyperPopulationMCMC(HyperSampler):
         super(HyperPopulationMCMC, self).__init__(pints.PopulationMCMC, model, noise, times, real_parameters, lower, upper)
 
     def n_parameters(self):
-        return 1
+        return 2
 
     def bounds(self):
-        return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(1, 20)}]
+        return [{'name': 'pop_size', 'type': 'discrete', 'domain': range(1, 20)},
+                {'name': 'nchains', 'type': 'discrete', 'domain': range(2, 20), 'dimensionality': 1}
+                ]
