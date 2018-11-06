@@ -131,11 +131,15 @@ class HyperDifferentialEvolutionMCMC(HyperSampler):
         super(HyperDifferentialEvolutionMCMC, self).__init__(pints.DifferentialEvolutionMCMC, model, noise, times, real_parameters, lower, upper)
 
     def n_parameters(self):
-        return 2
+        return 5
 
     def bounds(self):
         return [{'name': 'gamma', 'type': 'continuous', 'domain': (0, 20.38/np.sqrt(2*self.model().n_parameters()))},
-                {'name': 'normal_scale', 'type': 'continuous', 'domain': (0, 1)}]
+                {'name': 'normal_scale', 'type': 'continuous', 'domain': (0, 1)},
+                {'name': 'gamma_switch_rate', 'type': 'discrete', 'domain': range(1, 100)},
+                {'name': 'normal_error', 'type': 'discrete', 'domain': (False, True)},
+                {'name': 'relative_scaling', 'type': 'discrete', 'domain': (False, True)},
+                ]
 
 
 class HyperPopulationMCMC(HyperSampler):
