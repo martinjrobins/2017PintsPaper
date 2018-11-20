@@ -71,7 +71,6 @@ class HyperOptimiser:
         else:
             optimisation.set_parallel(False)
 
-        optimisation.set_log_interval(1000)
 
         start = timer()
         found_parameters, found_value = optimisation.run()

@@ -139,7 +139,7 @@ class HyperDifferentialEvolutionMCMC(HyperSampler):
                 {'name': 'gamma_switch_rate', 'type': 'discrete', 'domain': range(1, 100)},
                 {'name': 'normal_error', 'type': 'discrete', 'domain': (False, True)},
                 {'name': 'relative_scaling', 'type': 'discrete', 'domain': (False, True)},
-                {'name': 'nchains', 'type': 'discrete', 'domain': range(2, 20), 'dimensionality': 1}
+                {'name': 'nchains', 'type': 'discrete', 'domain': range(3, 20), 'dimensionality': 1}
                 ]
 
 
