@@ -35,7 +35,7 @@ from ._HyperSampler import (
 )
 
 
-models = [pints.toy.LogisticModel, pints.toy.HodgkinHuxleyIKModel,
+models = [pints.toy.LogisticModel,
           pints.toy.GoodwinOscillatorModel, pints.toy.FitzhughNagumoModel,
           pints.toy.Hes1Model, pints.toy.LotkaVolterraModel, pints.toy.RepressilatorModel,
           pints.toy.SIRModel]
