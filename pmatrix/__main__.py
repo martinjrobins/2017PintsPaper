@@ -13,6 +13,9 @@ import argparse
 import pmatrix
 import os
 
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
 
 def main():
     parser = argparse.ArgumentParser(description='Run matrix.')
@@ -26,6 +29,8 @@ def main():
                         help='three integers indicating the model, method and noise level')
     parser.add_argument('--run_all', action="store_true",
                         help='run entire matrix')
+    parser.add_argument('--skip_if_results_exist', action="store_true",
+                        help='skip tests if the results file already exists')
     parser.add_argument('--plot', action="store_true",
                         help='plot matrix results')
 
@@ -80,10 +85,12 @@ def main():
             for model in pmatrix.models:
                 for method in pmatrix.hyper_optimisers:
                     pmatrix.run_single(noise, model, method,
-                                       pmatrix.max_tuning_runs, pmatrix.num_samples)
+                                       pmatrix.max_tuning_runs, 
+                                       pmatrix.num_samples, args.skip_if_results_exist)
                 for method in pmatrix.hyper_mcmcs:
                     pmatrix.run_single(noise, model, method,
-                                       pmatrix.max_tuning_runs, pmatrix.num_samples)
+                                       pmatrix.max_tuning_runs, 
+                                       pmatrix.num_samples, args.skip_if_results_exist)
 
     if args.plot:
         pmatrix.plot_matrix(pmatrix.noise_levels, pmatrix.models,

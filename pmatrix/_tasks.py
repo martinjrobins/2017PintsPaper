@@ -19,7 +19,14 @@ def to_filename(noise_level, model, hyper_method):
     return pmatrix.DIR_RESULT + '/' + 'results-%s-%s-%s.pickle' % (model_str, hyper_method_str, noise_str)
 
 
-def run_single(noise_level, model, hyper_method, max_tuning_runs, num_samples):
+def run_single(noise_level, model, hyper_method, max_tuning_runs, num_samples, only_if_not_exist=False):
+    fname = to_filename(noise_level, model, hyper_method)
+
+    # dont run if flag set and file already exists
+    if only_if_not_exist and os.path.isfile(fname):
+        print('WARNING: skipping since results file',fname,'already exists')
+        return
+
     parameters = model().suggested_parameters()
     lower = np.asarray(parameters) / 10.0
     upper = np.asarray(parameters) * 10.0
@@ -41,7 +48,6 @@ def run_single(noise_level, model, hyper_method, max_tuning_runs, num_samples):
     else:
         raise TypeError("hyper_method must be an instance of HyperSampler or HyperOptimiser")
 
-    fname = to_filename(noise_level, model, hyper_method)
     print('writing ' + fname)
     pickle.dump(output, open(fname, 'wb'))
 
