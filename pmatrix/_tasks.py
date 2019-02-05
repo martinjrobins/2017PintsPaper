@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import os
 
 import pmatrix
+import pints
 
 
 def to_filename(noise_level, model, hyper_method):
@@ -24,35 +25,48 @@ def run_single(noise_level, model, hyper_method, max_tuning_runs, num_samples, o
 
     # dont run if flag set and file already exists
     if only_if_not_exist and os.path.isfile(fname):
-        print('WARNING: skipping since results file',fname,'already exists')
+        print('WARNING: skipping since results file', fname, 'already exists')
         return
 
     parameters = model().suggested_parameters()
     lower = np.asarray(parameters) / 10.0
     upper = np.asarray(parameters) * 10.0
     times = model().suggested_times()
+    hmethod = hyper_method(model,
+                           noise_level,
+                           times,
+                           parameters, lower, upper)
+
     if issubclass(hyper_method, pmatrix.HyperSampler):
+        if hmethod.uses_gradients() and not issubclass(model, pints.ForwardModelS1):
+            print("WARNING: not running combination of ",
+                  hyper_method.method_name, "and", model, "as latter has no gradients")
+            return
         output = mcmc_sampler(num_samples,
                               max_tuning_runs,
-                              hyper_method(model,
-                                           noise_level,
-                                           times,
-                                           parameters, lower, upper))
+                              hmethod)
     elif issubclass(hyper_method, pmatrix.HyperOptimiser):
         output = optimise_sampler(num_samples,
                                   max_tuning_runs,
-                                  hyper_method(model,
-                                               noise_level,
-                                               times,
-                                               parameters, lower, upper))
+                                  hmethod
+                                  )
+    elif issubclass(hyper_method, pmatrix.HyperNestedSampler):
+        output = mcmc_sampler(num_samples,
+                              max_tuning_runs,
+                              hmethod
+                              )
+
     else:
-        raise TypeError("hyper_method must be an instance of HyperSampler or HyperOptimiser")
+        raise TypeError(
+            "hyper_method must be an instance of HyperSampler "
+            "or HyperOptimiser or HyperNestedSampler"
+        )
 
     print('writing ' + fname)
     pickle.dump(output, open(fname, 'wb'))
 
 
-def plot_matrix(noise_levels, models, hyper_optimisers, hyper_mcmcs, max_tuning_runs, num_samples):
+def plot_matrix(noise_levels, models, hyper_optimisers, hyper_mcmcs, hyper_nested, max_tuning_runs, num_samples):
     f = plt.figure()
     y = range(len(models))
     y_labels = [m.__name__ for m in models]
@@ -70,13 +84,15 @@ def plot_matrix(noise_levels, models, hyper_optimisers, hyper_mcmcs, max_tuning_
             for no, optimiser in enumerate(hyper_optimisers):
                 fname = to_filename(noise, model, optimiser)
                 if os.path.exists(fname):
-                    print('reading results for (', model.__name__, ',', optimiser.method_name, ',', noise, ')')
+                    print('reading results for (', model.__name__,
+                          ',', optimiser.method_name, ',', noise, ')')
                     output = pickle.load(open(fname, 'rb'))
                     assert(len(output[:, 1]) == num_samples)
                     score[nm, no, :] = output[:, 1]
                     time[nm, no, :] = output[:, 2]
                 else:
-                    print('WARNING: no results for (', model.__name__, ',', optimiser.method_name, ',', noise, ')')
+                    print('WARNING: no results for (', model.__name__,
+                          ',', optimiser.method_name, ',', noise, ')')
                     score[nm, no, :] = float('nan')
                     time[nm, no, :] = float('nan')
             for no, mcmc in enumerate(hyper_mcmcs):
@@ -89,10 +105,24 @@ def plot_matrix(noise_levels, models, hyper_optimisers, hyper_mcmcs, max_tuning_
                     ess[nm, no, :] = output[:, 1]
                     time_mcmc[nm, no, :] = output[:, 2]
                 else:
-                    print('WARNING: no results for (', model.__name__, ',', mcmc.method_name, ',', noise, ')')
+                    print('WARNING: no results for (', model.__name__,
+                          ',', mcmc.method_name, ',', noise, ')')
                     rhat[nm, no, :] = float('nan')
                     ess[nm, no, :] = float('nan')
                     time_mcmc[nm, no, :] = float('nan')
+            for no, nested in enumerate(hyper_nested):
+                fname = to_filename(noise, model, nested)
+                if os.path.exists(fname):
+                    print('reading ' + fname)
+                    output = pickle.load(open(fname, 'rb'))
+                    assert(len(output[:, 1] == num_samples))
+                    ess_nested[nm, no, :] = output[:, 0]
+                    time_nested[nm, no, :] = output[:, 1]
+                else:
+                    print('WARNING: no results for (', model.__name__,
+                          ',', mcmc.method_name, ',', noise, ')')
+                    ess_nested[nm, no, :] = float('nan')
+                    time_nested[nm, no, :] = float('nan')
 
         normalise = False
         if normalise:
@@ -167,6 +197,7 @@ def plot_matrix(noise_levels, models, hyper_optimisers, hyper_mcmcs, max_tuning_
         plt.colorbar(label='rhat (min)')
         plt.tight_layout()
         plt.savefig(pmatrix.DIR_PLOT+'/'+'rhat_min_with_noise_%d.pdf' % ni)
+
         plt.clf()
         plt.imshow(np.mean(ess, axis=2),
                    cmap='RdYlBu_r', interpolation='nearest')
@@ -183,6 +214,7 @@ def plot_matrix(noise_levels, models, hyper_optimisers, hyper_mcmcs, max_tuning_
         plt.colorbar(label='ess (min)')
         plt.tight_layout()
         plt.savefig(pmatrix.DIR_PLOT+'/'+'ess_min_with_noise_%d.pdf' % ni)
+
         plt.clf()
         plt.imshow(np.mean(time_mcmc, axis=2),
                    cmap='RdYlBu_r', interpolation='nearest')
@@ -200,6 +232,40 @@ def plot_matrix(noise_levels, models, hyper_optimisers, hyper_mcmcs, max_tuning_
         plt.tight_layout()
         plt.savefig(pmatrix.DIR_PLOT+'/'+'time_mcmc_min_with_noise_%d.pdf' % ni)
 
+        plt.clf()
+        plt.imshow(np.mean(ess_nested, axis=2),
+                   cmap='RdYlBu_r', interpolation='nearest')
+        plt.xticks(x_nested, x_nested_labels, rotation=45)
+        plt.yticks(y, y_labels)
+        plt.colorbar(label='ess (mean)')
+        plt.tight_layout()
+        plt.savefig(pmatrix.DIR_PLOT+'/'+'ess_nested_mean_with_noise_%d.pdf' % ni)
+        plt.clf()
+        plt.imshow(np.min(ess_nested, axis=2),
+                   cmap='RdYlBu_r', interpolation='nearest')
+        plt.xticks(x_nested, x_nested_labels, rotation=45)
+        plt.yticks(y, y_labels)
+        plt.colorbar(label='ess (min)')
+        plt.tight_layout()
+        plt.savefig(pmatrix.DIR_PLOT+'/'+'ess_nested_min_with_noise_%d.pdf' % ni)
+
+        plt.clf()
+        plt.imshow(np.mean(time_nested, axis=2),
+                   cmap='RdYlBu_r', interpolation='nearest')
+        plt.xticks(x_nested, x_nested_labels, rotation=45)
+        plt.yticks(y, y_labels)
+        plt.colorbar(label='time_nested (mean)')
+        plt.tight_layout()
+        plt.savefig(pmatrix.DIR_PLOT+'/'+'time_nested_mean_with_noise_%d.pdf' % ni)
+        plt.clf()
+        plt.imshow(np.min(time_nested, axis=2),
+                   cmap='RdYlBu_r', interpolation='nearest')
+        plt.xticks(x_nested, x_nested_labels, rotation=45)
+        plt.yticks(y, y_labels)
+        plt.colorbar(label='time_nested (min)')
+        plt.tight_layout()
+        plt.savefig(pmatrix.DIR_PLOT+'/'+'time_nested_min_with_noise_%d.pdf' % ni)
+
 
 def optimise(sample_num, hyper, x):
     print('optimise for sample', sample_num)
@@ -210,7 +276,7 @@ def optimise_sampler(num_samples, max_tuning_runs, hyper):
     # tune hyper
     print("TUNING HYPER-PARAMETERS for hyper=", hyper)
     if (hyper.n_parameters() > 0):
-        #myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds(), num_cores=os.environ['OMP_NUM_THREADS'])
+        # myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds(), num_cores=os.environ['OMP_NUM_THREADS'])
         myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds())
         myBopt.run_optimization(max_iter=max_tuning_runs)
         x_opt = myBopt.x_opt
@@ -234,8 +300,10 @@ def mcmc_sampler(num_samples, max_tuning_runs, hyper):
     # tune hyper
     print("TUNING HYPER-PARAMETERS for hyper=", hyper)
     if (hyper.n_parameters() > 0):
-        #myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds(), num_cores=os.environ['OMP_NUM_THREADS'])
-        myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds())
+        # myBopt = BayesianOptimization(f=hyper, domain=hyper.bounds(), num_cores=os.environ['OMP_NUM_THREADS'])
+        myBopt = BayesianOptimization(f=hyper,
+                                      domain=hyper.bounds(),
+                                      constraints=hyper.constraints())
         myBopt.run_optimization(max_iter=max_tuning_runs)
         x_opt = myBopt.x_opt
     else:

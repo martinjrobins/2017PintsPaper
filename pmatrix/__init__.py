@@ -32,18 +32,30 @@ from ._HyperSampler import (
     HyperAdaptiveMCMC,
     HyperDifferentialEvolutionMCMC,
     HyperPopulationMCMC,
+    HyperDreamMCMC,
+    HyperEmceeHammerMCMC,
+    HyperHamiltonianMCMC,
 )
 
 
-models = [pints.toy.LogisticModel,
-          pints.toy.GoodwinOscillatorModel, pints.toy.FitzhughNagumoModel,
-          pints.toy.Hes1Model, pints.toy.LotkaVolterraModel, pints.toy.RepressilatorModel,
-          pints.toy.SIRModel]
+from ._HyperNestedSampler import (
+    HyperNestedSampler,
+    HyperNestedEllipsoid,
+    HyperNestedRejection,
+)
 
-optimisers = [pints.CMAES, pints.PSO, pints.XNES, pints.SNES]
 
-mcmcs = [pints.MetropolisRandomWalkMCMC,
-         pints.AdaptiveCovarianceMCMC, pints.DifferentialEvolutionMCMC, pints.PopulationMCMC]
+models = [
+    pints.toy.LogisticModel,
+    pints.toy.HodgkinHuxleyIKModel,
+    pints.toy.GoodwinOscillatorModel,
+    pints.toy.FitzhughNagumoModel,
+    pints.toy.Hes1Model,
+    pints.toy.LotkaVolterraModel,
+    pints.toy.RepressilatorModel,
+    pints.toy.SIRModel
+]
+
 
 noise_levels = [0.01, 0.1]
 
@@ -52,7 +64,30 @@ max_tuning_runs = 20
 
 hyper_optimisers = [HyperCMAES, HyperPSO, HyperXNES, HyperSNES]
 
-hyper_mcmcs = [HyperMCMC, HyperAdaptiveMCMC, HyperDifferentialEvolutionMCMC, HyperPopulationMCMC]
+hyper_mcmcs = [
+    HyperMCMC,
+    HyperAdaptiveMCMC,
+    HyperDifferentialEvolutionMCMC,
+    HyperPopulationMCMC,
+    HyperDreamMCMC,
+    HyperEmceeHammerMCMC,
+    HyperHamiltonianMCMC,
+]
+
+hyper_mcmcs = [
+    HyperMCMC,
+    HyperAdaptiveMCMC,
+    HyperDifferentialEvolutionMCMC,
+    HyperPopulationMCMC,
+    HyperDreamMCMC,
+    HyperEmceeHammerMCMC,
+    HyperHamiltonianMCMC,
+]
+
+hyper_nested = [
+    HyperNestedEllipsoid,
+    HyperNestedRejection,
+]
 
 DIR_PMATRIX = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 DIR_RESULT = os.path.join(DIR_PMATRIX, 'results')

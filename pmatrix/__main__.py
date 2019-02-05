@@ -45,23 +45,29 @@ def main():
         print('\nMethods:')
         for i, hyper_optimiser in enumerate(pmatrix.hyper_optimisers):
             print('\t', i, ':', hyper_optimiser.method_name)
+        start_index = len(pmatrix.hyper_optimisers)
         for i, hyper_mcmc in enumerate(pmatrix.hyper_mcmcs):
-            print('\t', i+len(pmatrix.hyper_optimisers), ':', hyper_mcmc.method_name)
+            print('\t', i+start_index, ':', hyper_mcmc.method_name)
+        start_index += len(pmatrix.hyper_mcmcs)
+        for i, hyper_nested in enumerate(pmatrix.hyper_nested):
+            print('\t', i+start_index, ':', hyper_nested.method_name)
         print('\nNoise Levels:')
         for i, noise in enumerate(pmatrix.noise_levels):
             print('\t', i, ':', noise)
 
+    size = len(pmatrix.models)
+    size *= (len(pmatrix.hyper_optimisers) +
+             len(pmatrix.hyper_mcmcs) +
+             len(pmatrix.hyper_nested))
+    size *= len(pmatrix.noise_levels)
+
     if args.max:
-        size = len(pmatrix.models)
-        size *= (len(pmatrix.hyper_optimisers) + len(pmatrix.hyper_mcmcs))
-        size *= len(pmatrix.noise_levels)
         print(size - 1)
 
     if args.run is not None:
         nm, no, ni = [int(arg) for arg in args.run]
-        if no < 0 or no >= len(pmatrix.hyper_optimisers) + len(pmatrix.hyper_mcmcs):
-            raise ValueError('method index must be less than ' +
-                             str(len(pmatrix.hyper_optimisers) + len(pmatrix.hyper_mcmcs)))
+        if no < 0 or no >= size:
+            raise ValueError('method index must be less than'+str(size))
         if no < len(pmatrix.hyper_optimisers):
             print('running matrix (%s,%s,%s)' % (pmatrix.models[nm].__name__,
                                                  pmatrix.hyper_optimisers[no].method_name,
@@ -70,7 +76,7 @@ def main():
                                pmatrix.models[nm],
                                pmatrix.hyper_optimisers[no],
                                pmatrix.max_tuning_runs, pmatrix.num_samples)
-        else:
+        elif no < len(pmatrix.hyper_optimisers) + len(pmatrix.hyper_mcmcs):
             no -= len(pmatrix.hyper_optimisers)
             print('running matrix (%s,%s,%s)' % (pmatrix.models[nm].__name__,
                                                  pmatrix.hyper_mcmcs[no].method_name,
@@ -79,22 +85,36 @@ def main():
                                pmatrix.models[nm],
                                pmatrix.hyper_mcmcs[no],
                                pmatrix.max_tuning_runs, pmatrix.num_samples)
+        else:
+            no -= len(pmatrix.hyper_optimisers) + len(pmatrix.hyper_mcmcs)
+            print('running matrix (%s,%s,%s)' % (pmatrix.models[nm].__name__,
+                                                 pmatrix.hyper_nested[no].method_name,
+                                                 pmatrix.noise_levels[ni]))
+            pmatrix.run_single(pmatrix.noise_levels[ni],
+                               pmatrix.models[nm],
+                               pmatrix.hyper_nested[no],
+                               pmatrix.max_tuning_runs, pmatrix.num_samples)
 
     if args.run_all:
         for noise in pmatrix.noise_levels:
             for model in pmatrix.models:
                 for method in pmatrix.hyper_optimisers:
                     pmatrix.run_single(noise, model, method,
-                                       pmatrix.max_tuning_runs, 
+                                       pmatrix.max_tuning_runs,
                                        pmatrix.num_samples, args.skip_if_results_exist)
                 for method in pmatrix.hyper_mcmcs:
                     pmatrix.run_single(noise, model, method,
-                                       pmatrix.max_tuning_runs, 
+                                       pmatrix.max_tuning_runs,
+                                       pmatrix.num_samples, args.skip_if_results_exist)
+                for method in pmatrix.hyper_nested:
+                    pmatrix.run_single(noise, model, method,
+                                       pmatrix.max_tuning_runs,
                                        pmatrix.num_samples, args.skip_if_results_exist)
 
     if args.plot:
         pmatrix.plot_matrix(pmatrix.noise_levels, pmatrix.models,
                             pmatrix.hyper_optimisers, pmatrix.hyper_mcmcs,
+                            pmatrix.hyper_nested,
                             pmatrix.max_tuning_runs,
                             pmatrix.num_samples)
 
